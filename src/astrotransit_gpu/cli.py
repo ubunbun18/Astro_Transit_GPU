@@ -42,6 +42,8 @@ def main():
     inject_parser.add_argument("--periods", type=str, default="2.0,5.0,10.0", help="Comma-separated periods to inject")
     inject_parser.add_argument("--depths", type=str, default="0.001,0.003,0.01", help="Comma-separated depths to inject")
     inject_parser.add_argument("--n-trials", type=int, default=3, help="Trials per grid cell")
+    inject_parser.add_argument("--out", type=str, default="injection_recovery_report.md", help="Output Markdown report path")
+
     # 'run-config' command
     run_cfg_parser = subparsers.add_parser("run-config", help="Run search using a YAML config file")
     run_cfg_parser.add_argument("config", type=str, help="Path to YAML config file")
@@ -53,6 +55,7 @@ def main():
     parser_compare = subparsers.add_parser("compare", help="Compare CPU (Astropy) vs GPU (CUDA) performance and accuracy")
     parser_compare.add_argument("--target", type=str, default="TIC 261136679", help="Target TIC ID")
     parser_compare.add_argument("--out", type=str, default="comparison_report.md", help="Output Markdown report path")
+    parser_compare.add_argument("--n-periods", type=int, default=5000, help="Number of periods in grid")
     
     args = parser.parse_args()
     
@@ -186,21 +189,21 @@ def main():
         print("Run completed from config. Plots and JSON generated.")
     elif args.command == "compare":
         from .search.cpu_reference_bls import run_astropy_bls
+        import time
         client = LightkurveClient()
         lc = client.download_lightcurve(args.target)
         lc_clean = clean_lightcurve(lc)
         time_arr, flux_arr = to_arrays(lc_clean)
         
-        periods = np.linspace(0.5, 20.0, 5000)
+        periods = np.linspace(0.5, 20.0, args.n_periods)
         durations = np.linspace(0.01, 0.2, 5)
         
-        print("Running CPU BLS...")
-        import time
+        print(f"Running CPU BLS with {len(periods)} periods...")
         start = time.time()
-        cpu_res = run_astropy_bls(time_arr, flux_arr, period_min=0.5, period_max=20.0, durations=durations)
+        cpu_res = run_astropy_bls(time_arr, flux_arr, periods=periods, durations=durations)
         cpu_time = time.time() - start
         
-        print("Running GPU BLS...")
+        print(f"Running GPU BLS with {len(periods)} periods...")
         start = time.time()
         gpu_res = run_gpu_bls(time_arr, flux_arr, periods, durations)
         gpu_time = time.time() - start

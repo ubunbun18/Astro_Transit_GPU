@@ -17,7 +17,7 @@
     - Concurrent I/O and CPU preprocessing using `ProcessPoolExecutor`.
     - Overlapping GPU kernel execution via multiple `CUDA Streams`.
 -   **Scientific Integrity**:
-    - Numerically verified against `astropy.timeseries.BoxLeastSquares` with a typical error of < 0.04%.
+    - Numerically benchmarked against `astropy.timeseries.BoxLeastSquares` on various cases with < 0.04% typical error in detected periods.
 
 ## 📊 Performance Benchmarks
 
@@ -63,7 +63,7 @@ astrotransit-gpu inject-run --target "TIC 261136679" --periods "2.0,5.0,10.0" --
 
 ## 🧪 Scientific Validation
 
-The BLS implementation is mathematically equivalent to the industry-standard `astropy.timeseries.BoxLeastSquares`.
+The custom GPU BLS implementation uses a phase-binning approach. It has been numerically validated against the industry-standard `astropy.timeseries.BoxLeastSquares` to ensure consistent planet recovery.
 
 | Parameter | Astropy (CPU) | AstroTransit-GPU | Delta |
 | :--- | :--- | :--- | :--- |

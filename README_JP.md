@@ -17,7 +17,7 @@
     - `ProcessPoolExecutor` による I/O と CPU 前処理（ダウンロード、クリーニング）の同時並列実行。
     - `CUDA Streams` による GPU カーネル実行の多重化とオーバーラップ。
 -   **科学的妥当性の確保**:
-    - `astropy.timeseries.BoxLeastSquares` と数値的に検証済み（標準的な誤差 < 0.04%）。
+    - `astropy.timeseries.BoxLeastSquares` との比較検証済み（検出周期の典型的な誤差 < 0.04%）。
 
 ## 📊 ベンチマーク結果
 
@@ -63,7 +63,7 @@ astrotransit-gpu inject-run --target "TIC 261136679" --periods "2.0,5.0,10.0" --
 
 ## 🧪 科学的検証 (Scientific Validation)
 
-本システムの BLS 実装は、業界標準の `astropy.timeseries.BoxLeastSquares` と数学的に等価です。
+本システムの GPU BLS 実装はフェーズ・ビン詰め（Phase-binning）による近似アルゴリズムを使用しています。業界標準の `astropy.timeseries.BoxLeastSquares` と数値的に比較検証されており、一貫した惑星検出能力を確認済みです。
 
 | パラメータ | Astropy (CPU) | AstroTransit-GPU | 誤差 |
 | :--- | :--- | :--- | :--- |
