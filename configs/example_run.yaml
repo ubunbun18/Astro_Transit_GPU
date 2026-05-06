@@ -1,0 +1,6 @@
+target: "TIC 261136679"
+mission: "tess"
+search:
+  period_min: 0.5
+  period_max: 20.0
+  n_periods: 10000

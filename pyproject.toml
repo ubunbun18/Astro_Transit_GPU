@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "astrotransit-gpu"
+version = "0.1.0"
+description = "High-performance GPU-accelerated transit search platform"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "cupy-cuda12x",
+    "numpy",
+    "astropy",
+    "lightkurve",
+    "pandas",
+    "scipy",
+    "matplotlib",
+    "pyyaml",
+    "tabulate",
+    "tqdm",
+]
+
+[project.scripts]
+astrotransit-gpu = "astrotransit_gpu.cli:main"
