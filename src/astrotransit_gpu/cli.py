@@ -86,7 +86,13 @@ def main():
         results = run_gpu_bls(time_arr, flux_arr, periods, durations)
         
         if args.true_p:
-            m = match_candidate(results['best_period'], results['best_t0'], args.true_p, args.true_t0 or 0)
+            m = match_candidate(
+                results['best_period'], 
+                results['best_t0'], 
+                args.true_p, 
+                args.true_t0,
+                require_t0=args.true_t0 is not None
+            )
             results['match'] = m
             
         # Extract Top-K

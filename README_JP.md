@@ -70,6 +70,24 @@ astrotransit-gpu inject-run --target "TIC 261136679" --periods "2.0,5.0,10.0" --
 | **検出周期** | 6.268017 d | 6.265353 d | 2.66e-3 d |
 | **探索グリッド** | `linspace` | `linspace` | 完全一致 |
 
+## 📋 ベンチマークの再現方法
+
+お使いの環境で性能を測定するには、以下のコマンドを実行してください：
+
+```bash
+astrotransit-gpu compare \
+  --target "TIC 261136679" \
+  --n-periods 5000 \
+  --out reports/performance/repro_benchmark.md
+```
+
+### 測定環境（リファレンス）:
+- **GPU**: NVIDIA RTX 4090 / H100
+- **CUDA**: 12.x
+- **CuPy**: 13.x
+- **OS**: Windows / Linux
+- **Python**: 3.9+
+
 ## 📝 ライセンス
 
 MIT License。詳細は `LICENSE` ファイルを参照してください。

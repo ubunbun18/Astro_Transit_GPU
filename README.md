@@ -70,6 +70,24 @@ The custom GPU BLS implementation uses a phase-binning approach. It has been num
 | **Detected Period** | 6.268017 d | 6.265353 d | 2.66e-3 d |
 | **Search Grid** | `linspace` | `linspace` | Exact Match |
 
+## 📋 Reproducing Benchmarks
+
+To reproduce the performance results on your hardware, run:
+
+```bash
+astrotransit-gpu compare \
+  --target "TIC 261136679" \
+  --n-periods 5000 \
+  --out reports/performance/repro_benchmark.md
+```
+
+### Environment for baseline results:
+- **GPU**: NVIDIA RTX 4090 / H100
+- **CUDA**: 12.x
+- **CuPy**: 13.x
+- **OS**: Windows / Linux
+- **Python**: 3.9+
+
 ## 📝 License
 
 Distributed under the MIT License. See `LICENSE` for more information.

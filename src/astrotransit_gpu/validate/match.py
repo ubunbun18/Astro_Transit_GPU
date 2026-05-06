@@ -1,6 +1,9 @@
-def match_candidate(p_detected, t0_detected, p_true, t0_true, p_tol=0.01, t0_tol=0.1):
+def match_candidate(p_detected, t0_detected, p_true, t0_true, p_tol=0.01, t0_tol=0.1, require_t0=True):
     """
-    Check if a detected candidate matches a true signal with phase consistency.
+    Match a detected candidate against a true transit signal.
+    
+    The phase check verifies if the detected t0 lies on the expected 
+    transit series: t0_true + k * p_true.
     """
     if p_true <= 0 or p_detected <= 0:
         return {"is_match": False, "match_type": "none"}
@@ -18,10 +21,13 @@ def match_candidate(p_detected, t0_detected, p_true, t0_true, p_tol=0.01, t0_tol
         p_diff = abs(p_detected - p_target) / p_target
         
         if p_diff < p_tol:
-            # Phase check (T0 matching)
-            # Use detected period for phase wrapping
-            phase_diff = abs((t0_detected - t0_true) % p_detected)
-            phase_diff = min(phase_diff, p_detected - phase_diff)
+            if not require_t0 or t0_true is None:
+                return {"is_match": True, "match_type": m_type, "p_diff": p_diff}
+
+            # Phase check based on TRUE period transit series
+            # (t0_det - t0_true) % p_true should be near 0 or p_true
+            phase_diff = abs((t0_detected - t0_true) % p_true)
+            phase_diff = min(phase_diff, p_true - phase_diff)
             
             if phase_diff < t0_tol:
                 return {
