@@ -33,7 +33,7 @@
 ## 🚀 インストール
 
 ```bash
-git clone https://github.com/yourusername/AstroTransit-GPU.git
+git clone https://github.com/ubunbun18/AstroTransit-GPU.git
 cd AstroTransit-GPU
 pip install .
 ```
