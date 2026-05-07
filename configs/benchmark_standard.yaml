@@ -1,0 +1,13 @@
+benchmark_id: tess_tic_261136679_standard
+target: TIC 261136679
+mission: tess
+period_min: 0.5
+period_max: 20.0
+n_periods: 5000
+durations: [0.01, 0.0575, 0.105, 0.1525, 0.2]
+n_bins: 200
+backend_cpu: astropy
+backend_gpu: astrotransit_gpu
+precision: float32
+warmup_runs: 2
+timed_runs: 5

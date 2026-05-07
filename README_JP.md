@@ -1,67 +1,80 @@
-# AstroTransit-GPU 🚀
+# AstroTransit-GPU (v1.0.0)
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![CUDA 12.x](https://img.shields.io/badge/CUDA-12.x-green.svg)](https://developer.nvidia.com/cuda-toolkit)
+[![CI](https://github.com/ubunbun18/Astro_Transit_GPU/actions/workflows/ci.yml/badge.svg)](https://github.com/ubunbun18/Astro_Transit_GPU/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](./CHANGELOG.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-**AstroTransit-GPU** は、TESS や Kepler などの時系列光度データから惑星トランジットを探索するための、CUDA 加速プラットフォームです。独自の CUDA カーネルによる並列演算と非同期処理パイプラインにより、大規模な系外惑星サーベイにおける探索スループットを最大化します。
+**AstroTransit-GPU** は、TESS/Kepler 光度曲線に対するトランジット探索（Box Least Squares）を CUDA で高速化し、Astropy との数値的一致を保証しつつ、再現可能なベンチマークと注入実験（Injection/Recovery）を可能にする研究者向けの GPU 探索基盤です。
 
-## 🔬 技術的特徴
+## 🌟 特徴
 
--   **並列 BLS カーネル**: 
-    - **周期タイリング**: 1回のメモリ読み込みで複数の周期を並列処理し、スループットを向上。
-    - **並列累積和探索**: スレッド間通信を利用した高速なスライディングウィンドウ探索。
--   **非同期データ処理**:
-    - `ProcessPoolExecutor` による CPU 前処理（ダウンロード・クリーニング）と GPU 演算のオーバーラップ。
--   **数値的一致の検証**:
-    - 業界標準の `astropy.timeseries.BoxLeastSquares` と同一の探索グリッド上で比較検証を行い、科学的な整合性を確保。
-
-## 📊 パフォーマンスと信頼性
-
-AstroTransit-GPU は、探索グリッドが高密度になるほど、CPU (Astropy) に対するスループットの優位性が拡大します。
-
-| 探索規模 | 周期グリッド数 | 加速倍率 (CPU比) |
-| :--- | :--- | :--- |
-| **Standard** | 5,000 | 約 7.5倍 |
-| **Large** | 100,000 | 約 79倍 |
-| **Extreme** | 1,000,000 | **130倍以上** |
-
-> [!NOTE]
-> 詳細な測定条件、数値的な一致度（精度）、および再現コマンドについては、[BENCHMARK_REPORT_JP.md](./BENCHMARK_REPORT_JP.md) を参照してください。
+- **高速かつ正確**: CUDA による並列化で Astropy 比 100 倍以上のスループットを達成しつつ、スペクトル全体の相関（Correlation > 0.99）を維持。
+- **Astropy 互換 API**: 既存のワークフローに組み込みやすいオブジェクト指向設計。
+- **実データ対応**: `flux_err`（重み付き解析）および `float64`（倍精度）をフルサポート。
+- **検証機能**: 注入実験（Recovery Heatmap）とベンチマーク・レポートの自動生成。
+- **高い再現性**: YAML 設定ファイル、シード固定、統計的計測（Median/P95）による信頼性の担保。
 
 ## 🚀 インストール
 
+CPU 環境でもインストール可能ですが、GPU 加速を利用するには CUDA 対応の CuPy が必要です。
+
 ```bash
+# 開発モードでインストール (推奨)
 git clone https://github.com/ubunbun18/Astro_Transit_GPU.git
 cd Astro_Transit_GPU
-pip install .
+pip install -e ".[cuda12,benchmark]"
 ```
 
-## 🛠️ CLI コマンド
+## 🛠️ クイックスタート (Python API)
+
+```python
+from astrotransit_gpu import BoxLeastSquaresGPU
+import numpy as np
+
+# データの準備 (TESS/Kepler等)
+t = np.linspace(0, 10, 5000)
+y = np.ones_like(t)  # 光度データ
+dy = np.ones_like(t) * 0.001 # 誤差 (オプション)
+
+# モデルの初期化 (Astropy互換)
+model = BoxLeastSquaresGPU(t, y, dy=dy)
+
+# 探索の実行
+periods = np.linspace(0.5, 20.0, 10000)
+durations = [0.05, 0.1, 0.15]
+results = model.power(periods, durations, n_bins=500)
+
+print(f"Best Period: {results.best_period:.4f} days")
+print(f"Best Power (SNR): {results.best_power:.2f}")
+```
+
+## 💻 CLI コマンド
 
 | コマンド | 説明 |
 | :--- | :--- |
-| `check` | GPU の可用性と CUDA 環境を診断。 |
-| `compare` | CPU と GPU の速度・精度を直接比較。 |
-| `known` | 特定の既知ターゲットに対する探索とレポート生成。 |
-| `batch` | NASA カタログからターゲットを一括取得し、非同期並列解析。 |
-| `inject-run` | 信号注入実験を行い、回収率マップを生成。 |
-| `run-config` | YAML 設定ファイルに基づいた実験の実行。 |
+| `check` | GPU の可用性と CUDA 環境の診断。 |
+| `compare` | CPU と GPU の数値パリティ・性能比較。`--preset` を使用可能。 |
+| `inject` | 注入実験を実行し、回収率マップ（Recovery Heatmap）を生成。 |
+| `benchmark` | 設定ファイル（YAML）から再現可能な検証レポートを自動生成。 |
+| `search` | 単一ターゲットに対する高速探索と結果表示。 |
+| `batch` | ターゲットリストに基づく一括並列解析。 |
 
-詳細なオプションと使用例は [BENCHMARK_REPORT_JP.md](./BENCHMARK_REPORT_JP.md) に記載されています。
+詳細な引数や実行例については、[CLI 完全リファレンス (docs/CLI_REFERENCE_JP.md)](./docs/CLI_REFERENCE_JP.md) を参照してください。
 
-## 📋 性能の再現方法
+## 📊 ベンチマークと検証
 
-お使いの環境で性能を測定するには、以下のコマンドを実行してください：
+詳細な検証手法と最新のベンチマーク結果については、[BENCHMARK_REPORT_JP.md](./BENCHMARK_REPORT_JP.md) を参照してください。
 
-```bash
-# 標準解像度での比較
-astrotransit-gpu compare --preset standard
-```
+## 📖 制限事項と注意点
 
-## 📝 ライセンス
+- 現バージョンの GPU バックエンドは位相ビン詰め（Phase Binning）アルゴリズムを使用しています。
+- デフォルトの精度は `float32` です。超長期間のデータで精度が必要な場合は `float64` を指定してください。
+- 本パッケージは候補の高速スクリーニングを目的としており、最終的な MCMC フィッティング機能は含みません。
 
-MIT License。詳細は `LICENSE` ファイルを参照してください。
+## 📄 引用 (Citation)
 
----
-*Scaling Exoplanet Discovery with Reliability.*
+研究で本ソフトウェアを使用された場合は、[CITATION.cff](./CITATION.cff) を参照して引用してください。
+
+## ⚖️ ライセンス
+
+MIT License - 詳細は [LICENSE](./LICENSE) を参照してください。

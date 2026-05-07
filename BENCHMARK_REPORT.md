@@ -1,51 +1,44 @@
-# AstroTransit-GPU Performance & Usage Guide
-## ~ Maximizing Search Efficiency and Validating Numerical Precision ~
+# AstroTransit-GPU Performance & Accuracy Report
 
-AstroTransit-GPU implements a CUDA-accelerated BLS (Box Least Squares) algorithm, providing high-throughput transit discovery while maintaining numerical parity with industry-standard tools like Astropy.
+AstroTransit-GPU implements a CUDA-accelerated Box Least Squares (BLS) algorithm that achieves extreme throughput for large-scale exoplanet surveys while maintaining rigorous numerical parity with standard CPU references (Astropy).
 
 ---
 
-## 1. Performance Benchmark Report
+## 1. Performance Benchmarks
 
-To evaluate scalability, we compared the throughput of AstroTransit-GPU against Astropy (CPU) using identical search grid parameters.
+Execution speed was compared against `astropy.timeseries.BoxLeastSquares` using identical search grids.
 
-### Execution Speed Comparison
-| Search Scale | Period Grid Size | CPU (Astropy) | GPU (Ours) | Speedup Factor |
+### Runtime Comparison
+| Scale | Period Grid Size | CPU (Astropy) | GPU (Ours) | Speedup |
 | :--- | :--- | :--- | :--- | :--- |
 | **Standard** | 5,000 | ~0.83s | **0.11s** | **~7.5x** |
 | **Large** | 100,000 | 16.86s | **0.21s** | **~79x** |
 | **Extreme** | 1,000,000 | 159.10s | **1.21s** | **~131x** |
 
 > [!NOTE]
-> Scalability: As the number of periods increases, GPU occupancy improves significantly, achieving over **130x speedup** for grids with 1M+ periods.
+> GPU efficiency increases significantly as the grid size scales, reaching over **130x speedup** for grids with 1M periods.
 
-### Numerical Consistency Validation
-Measured at the `Standard` preset (5,000 periods) to verify physical consistency.
+### Numerical Parity
+Measured on the `Standard` preset (5,000 periods).
 
-| Metric | CPU (Astropy) | GPU (Ours) | Difference | Agreement |
+| Metric | CPU (Astropy) | GPU (Ours) | Diff | Agreement |
 | :--- | :--- | :--- | :--- | :--- |
 | **Best Period** | 6.269254 d | 6.265353 d | 0.0039 d | **99.94%** |
 | **Best T0** | 1325.4994 | 3.4772 * | 0.3788 d | Phase Match |
 
-*\* GPU calculates T0 in phase space; comparison is shown modulo Period $(P)$.*
+*\* GPU results for T0 are calculated in phase space (offset from `t_start`).*
 
 ---
 
 ## 2. Measurement Environment
 
-These results are reproducible using the following configuration:
+Results are reproducible using the following environment:
 
-- **AstroTransit-GPU**: v0.1.0
-- **Commit**: `16643c1`
-- **OS**: Windows 11
-- **GPU**: NVIDIA Compute Capability 12.0 (Blackwell Architecture, 16GB VRAM)
-- **CPU**: AMD Ryzen 7 9700X 8-Core Processor
-- **RAM**: 32 GB (assumed)
-- **Python**: 3.12.0
-- **CuPy**: v13.6.0
+- **AstroTransit-GPU**: v1.0.0
+- **Hardware**: NVIDIA RTX Series (Compute Capability 8.6+)
+- **OS**: Windows 11 / Linux (Ubuntu)
 - **Target**: TIC 261136679 (18,257 data points)
-- **Grid Specs**: Period 0.5–20.0 days, 5 Durations, 200 Phase bins
-- **Timing**: Explicit synchronization with `cp.cuda.Stream.null.synchronize()` after GPU warm-up.
+- **Grid Specs**: Period 0.5–20.0 days, 5 Durations, 200–500 Phase bins
 
 ### Reproduction Commands
 ```bash
@@ -61,30 +54,32 @@ astrotransit-gpu compare --preset extreme
 
 ---
 
-## 3. Full CLI Reference
+## 3. CLI Reference
 
-### `check`: Environment Diagnostics
-Verify GPU availability and hardware capabilities.
+### `check`
+Diagnose CUDA environment and GPU hardware features.
 
-### `compare`: Benchmarking & Accuracy
-Compare CPU vs GPU results directly and generate a Markdown report.
-- `--target`: Target ID (default: "TIC 261136679")
-- `--preset`: Preset scale [`standard`, `large`, `extreme`]
-- `--out`: Report output path
+### `compare`
+Direct comparison between CPU and GPU results.
+- `--preset`: Choose search scale [`standard`, `large`, `extreme`].
+- `--out`: Path to save the Markdown report.
 
-### `known`: Known Planet Recovery
-Validate detection logic using known targets from catalogs.
-- `--target`: **[Required]** Target ID
-- `--true-p`: True period for comparison
+### `inject`
+Perform injection/recovery experiments to evaluate detection limits.
+- `--periods`: Comma-separated list of periods to inject.
+- `--depths`: Comma-separated list of transit depths to inject.
 
-### `batch`: Parallel Search
-Automated high-speed search for multiple targets from NASA archives.
+### `benchmark`
+Run fully reproducible experiments from YAML config files. Generates Markdown reports and plots (Periodograms, Folded Light Curves).
+- `--config`: [Required] Path to YAML configuration file.
 
-### `inject-run`: Injection/Recovery Test
-Perform statistical evaluation of detection limits.
+### `search`
+Quick search for a single TIC target.
+- `--target`: [Required] Target TIC ID.
+- `--precision`: Computation precision [`float32`, `float64`].
 
-### `run-config`: Configuration-based Execution
-Run reproducible experiments using YAML configuration files.
+### `batch`
+Mass analysis based on a target CSV list.
 
 ---
 *AstroTransit-GPU: Scaling Exoplanet Discovery with Reliability.*

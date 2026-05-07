@@ -7,6 +7,9 @@ from astrotransit_gpu.search.cpu_reference_bls import run_astropy_bls
 from astrotransit_gpu.search.gpu_bls import run_gpu_bls
 from astrotransit_gpu.inject.box import inject_box_transit
 
+import pytest
+
+@pytest.mark.gpu
 def test_accuracy():
     # 1. Create synthetic data
     t = np.linspace(0, 20, 5000)
@@ -20,6 +23,7 @@ def test_accuracy():
     
     f_injected = inject_box_transit(t, f, true_p, true_t0, true_dur, true_depth)
     # Add minor noise
+    np.random.seed(42)
     f_injected += np.random.normal(0, 0.0005, size=len(t))
     
     # 2. Define search grid

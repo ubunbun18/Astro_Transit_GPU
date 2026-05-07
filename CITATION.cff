@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: "ubunbun18"
+    given-names: "Curious Hobbyist"
+title: "AstroTransit-GPU: High-performance GPU-accelerated transit search platform"
+version: 1.0.0
+date-released: 2026-05-07
+url: "https://github.com/ubunbun18/Astro_Transit_GPU"

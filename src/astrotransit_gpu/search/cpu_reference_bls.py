@@ -1,14 +1,14 @@
 from astropy.timeseries import BoxLeastSquares
 import numpy as np
 
-def run_astropy_bls(time, flux, periods=None, period_min=0.5, period_max=20.0, durations=None):
+def run_astropy_bls(time, flux, dy=None, periods=None, period_min=0.5, period_max=20.0, durations=None):
     """
     Run Astropy BLS as a reference.
     """
     if durations is None:
         durations = np.linspace(0.01, 0.2, 5) 
     
-    model = BoxLeastSquares(time, flux)
+    model = BoxLeastSquares(time, flux, dy=dy)
     
     if periods is None:
         results = model.autopower(durations, minimum_period=period_min, maximum_period=period_max)

@@ -16,14 +16,16 @@ def test_cli_check():
     assert res.returncode == 0
     assert "GPU" in res.stdout
 
+@pytest.mark.gpu
 def test_cli_compare_smoke():
-    # Run compare on a small grid to ensure no crashes (AttributeError check)
-    res = run_cli(["compare", "--target", "TIC 261136679", "--n-periods", "100", "--out", "test_compare.md"])
+    # Run compare with standard preset
+    res = run_cli(["compare", "--target", "TIC 261136679", "--preset", "standard", "--n-runs", "1", "--out", "test_compare.md"])
     assert res.returncode == 0
-    assert "Comparison report generated" in res.stdout
+    assert "report written to" in res.stdout
 
+@pytest.mark.gpu
 def test_cli_inject_smoke():
-    # Test project issue #1: AttributeError in inject-run
-    res = run_cli(["inject-run", "--target", "TIC 261136679", "--periods", "5.0", "--depths", "0.01", "--n-trials", "1", "--out", "test_inject.md"])
+    # Renamed inject-run to inject in v1.0.0
+    res = run_cli(["inject", "--target", "TIC 261136679", "--periods", "5.0", "--depths", "0.01", "--n-trials", "1", "--out", "test_inject.md"])
     assert res.returncode == 0
-    assert "Injection/Recovery report generated" in res.stdout
+    assert "report written to" in res.stdout

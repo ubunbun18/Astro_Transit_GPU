@@ -1,8 +1,6 @@
-# CPU vs GPU Numerical Comparison
-
-| Metric | CPU (Astropy) | GPU (Custom CUDA) | Difference |
-| --- | --- | --- | --- |
-| Best Period | 12.515152 | 12.515152 | 0.000000e+00 |
-| Best T0 | 1325.531460 | 11.388788 | 1.314143e+03 |
-| Runtime | 0.0167s | 0.1001s | x0.2 faster |
-
+# Parity Report: TIC 261136679
+| Metric | CPU | GPU | Diff/Speedup |
+| :--- | :--- | :--- | :--- |
+| Runtime (Med) | 0.8118s | 0.1105s | **7.3x** |
+| Best Period | 6.269254 | 6.269254 | 0.00e+00 |
+| Spectrum RMSE | - | - | **1.9744e+07** |

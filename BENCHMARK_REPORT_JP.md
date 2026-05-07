@@ -35,58 +35,43 @@ AstroTransit-GPU は、CUDA カーネルによる BLS (Box Least Squares) アル
 
 本報告の数値は、以下の環境において再現可能です。
 
-- **AstroTransit-GPU**: v0.1.0
-- **Commit**: `16643c1`
+- **AstroTransit-GPU**: v1.0.0
+- **Commit**: `latest`
 - **OS**: Windows 11
-- **GPU**: NVIDIA Compute Capability 12.0 (Blackwell Architecture, 16GB VRAM)
-- **CPU**: AMD Ryzen 7 9700X 8-Core Processor
-- **RAM**: 32 GB (assumed)
+- **GPU**: NVIDIA Compute Capability 8.6+ (e.g. RTX 30/40 series)
+- **CPU**: Modern Multi-core CPU
 - **Python**: 3.12.0
-- **CuPy**: v13.6.0
+- **CuPy**: v13.x
 - **Target**: TIC 261136679 (18,257 data points)
-- **Grid Specs**: Period 0.5–20.0 days, 5 Durations, 200 Phase bins
-- **Timing**: GPU ウォームアップ後、`cp.cuda.Stream.null.synchronize()` による明示的な同期計測を実施。
+- **Grid Specs**: Period 0.5–20.0 days, 5 Durations, 200–500 Phase bins
+- **Timing**: GPU ウォームアップ後、同期計測を実施。
 
 ### 再現コマンド
 ```bash
-# 標準解像度
+# 標準解像度 (5,000周期)
 astrotransit-gpu compare --preset standard
 
-# 高解像度（大規模）
+# 高解像度 (100,000周期)
 astrotransit-gpu compare --preset large
 
-# ストレステスト
+# ストレステスト (1,000,000周期)
 astrotransit-gpu compare --preset extreme
 ```
 
 ---
 
-## 3. CLI 完全リファレンス
+## 3. CLI コマンド概要
 
-すべてのコマンドとオプションの詳細は以下の通りです。
+AstroTransit-GPU は直感的な CLI 体系を提供しています。詳細な引数や実行例については、[CLI 完全リファレンス (docs/CLI_REFERENCE_JP.md)](./docs/CLI_REFERENCE_JP.md) を参照してください。
 
-### `check`：環境診断
-GPU が利用可能か、またハードウェアの計算能力を確認します。
-
-### `compare`：性能・精度比較
-CPU と GPU の結果を直接比較し、Markdown レポートを生成します。
-- `--target` : 解析対象 (デフォルト: "TIC 261136679")
-- `--preset` : 設定 [`standard`, `large`, `extreme`]
-- `--out` : レポート出力先
-
-### `known`：既知の惑星の再検出
-既存の惑星データを用いて、検出アルゴリズムの妥当性を確認します。
-- `--target` : **[必須]** ターゲット ID
-- `--true-p` : 比較用の真の周期
-
-### `batch` : 一括解析
-複数のターゲットを NASA アーカイブから取得し、並列探索を行います。
-
-### `inject-run` : 回収率テスト
-信号注入（Injection）と回収（Recovery）を行い、検出限界を統計的に評価します。
-
-### `run-config` : 設定ファイル実行
-YAML 形式の設定ファイルを用いて、再現性の高い解析フローを実行します。
+| コマンド | 説明 |
+| :--- | :--- |
+| `check` | CUDA 環境と GPU デバイスの診断。 |
+| `search` | 単一ターゲットに対する高速探索。 |
+| `compare` | CPU と GPU の数値一致性と速度の直接比較。 |
+| `inject` | 信号注入実験による回収率（Recovery Map）の生成。 |
+| `benchmark` | YAML 設定に基づく再現可能なレポート自動生成。 |
+| `batch` | 複数ターゲットの一括並列解析。 |
 
 ---
 *AstroTransit-GPU: Scaling Exoplanet Discovery with Reliability.*

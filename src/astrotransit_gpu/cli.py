@@ -1,250 +1,246 @@
 import argparse
 import sys
-from . import __version__
-
+import numpy as np
+import time
+import yaml
+import pandas as pd
 from .data.lightkurve_client import LightkurveClient
 from .preprocess.clean import clean_lightcurve, to_arrays
-from .report.plots import plot_periodogram, plot_folded_lightcurve
-from .report.json_report import save_json_report
-from .search.gpu_bls import run_gpu_bls, get_top_k_candidates
-import yaml
-import numpy as np
+from .search.api import BoxLeastSquaresGPU
+from .search.cpu_reference_bls import run_astropy_bls
 from .inject.grid import run_injection_recovery_experiment, calculate_recovery_map
-from .data.exoplanet_archive import ExoplanetArchiveClient
-from .validate.known_planets import run_batch_known_search, generate_batch_report_md
-from .validate.match import match_candidate
-from .report.markdown_report import generate_markdown_report
-import os
 
 def main():
-    parser = argparse.ArgumentParser(description="AstroTransit-GPU: GPU-accelerated transit search platform")
-    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
-    
-    subparsers = parser.add_subparsers(dest="command", help="Available commands")
-    
-    # 'known' command
-    known_parser = subparsers.add_parser("known", help="Redetect known planets")
-    known_parser.add_argument("--target", type=str, required=True, help="Target ID (e.g. 'TIC 261136679')")
-    known_parser.add_argument("--mission", choices=["tess", "kepler"], default="tess")
-    known_parser.add_argument("--true-p", type=float, help="True period if known")
-    known_parser.add_argument("--true-t0", type=float, help="True t0 if known")
-    known_parser.add_argument("--out", type=str, default="report.md", help="Output path")
-    
-    # 'batch' command
-    batch_parser = subparsers.add_parser("batch", help="Batch process known targets")
-    batch_parser.add_argument("--n-targets", type=int, default=10, help="Number of targets to fetch")
-    batch_parser.add_argument("--min-depth", type=float, default=500.0, help="Minimum catalog depth in ppm")
-    batch_parser.add_argument("--out", type=str, default="batch_report.md", help="Output path")
-    
-    # 'inject-run' command
-    inject_parser = subparsers.add_parser("inject-run", help="Run injection/recovery experiment")
-    inject_parser.add_argument("--target", type=str, required=True, help="Base target ID")
-    inject_parser.add_argument("--periods", type=str, default="2.0,5.0,10.0", help="Comma-separated periods to inject")
-    inject_parser.add_argument("--depths", type=str, default="0.001,0.003,0.01", help="Comma-separated depths to inject")
-    inject_parser.add_argument("--n-trials", type=int, default=3, help="Trials per grid cell")
-    inject_parser.add_argument("--out", type=str, default="injection_recovery_report.md", help="Output Markdown report path")
+    parser = argparse.ArgumentParser(description="AstroTransit-GPU v1.0: High-performance Transit Search Platform")
+    subparsers = parser.add_subparsers(dest="command")
 
-    # 'run-config' command
-    run_cfg_parser = subparsers.add_parser("run-config", help="Run search using a YAML config file")
-    run_cfg_parser.add_argument("config", type=str, help="Path to YAML config file")
-    
-    # 0. Check command
-    parser_check = subparsers.add_parser("check", help="Check environment and GPU availability")
-    
-    # 1. Compare command
-    parser_compare = subparsers.add_parser("compare", help="Compare CPU (Astropy) vs GPU (CUDA) performance and accuracy")
-    parser_compare.add_argument("--target", type=str, default="TIC 261136679", help="Target TIC ID")
-    parser_compare.add_argument("--out", type=str, default="comparison_report.md", help="Output Markdown report path")
-    parser_compare.add_argument("--n-periods", type=int, default=5000, help="Number of periods in grid")
-    parser_compare.add_argument("--preset", choices=["standard", "large", "extreme"], help="Benchmark preset (standard: 5k, large: 100k, extreme: 1M periods)")
-    
+    # 1. check
+    subparsers.add_parser("check", help="Check GPU and CUDA availability")
+
+    # 2. search
+    parser_search = subparsers.add_parser("search", help="Search for transits in a single target")
+    parser_search.add_argument("--target", type=str, required=True, help="Target TIC ID")
+    parser_search.add_argument("--n-periods", type=int, default=5000)
+    parser_search.add_argument("--precision", choices=["float32", "float64"], default="float32")
+    parser_search.add_argument("--out", type=str, help="Save result to file")
+
+    # 3. compare
+    parser_compare = subparsers.add_parser("compare", help="Strict CPU vs GPU parity comparison")
+    parser_compare.add_argument("--target", type=str, default="TIC 261136679")
+    parser_compare.add_argument("--preset", choices=["standard", "large", "extreme"], default="standard")
+    parser_compare.add_argument("--n-runs", type=int, default=5)
+    parser_compare.add_argument("--out", type=str, default="comparison_report.md")
+
+    # 4. inject
+    parser_inject = subparsers.add_parser("inject", help="Run injection/recovery experiment")
+    parser_inject.add_argument("--target", type=str, default="TIC 261136679")
+    parser_inject.add_argument("--periods", type=str, default="2.0,5.0,10.0")
+    parser_inject.add_argument("--depths", type=str, default="0.001,0.005,0.01")
+    parser_inject.add_argument("--n-trials", type=int, default=5)
+    parser_inject.add_argument("--out", type=str, default="injection_report.md")
+
+    # 5. benchmark
+    parser_bench = subparsers.add_parser("benchmark", help="Run reproducible benchmark from config")
+    parser_bench.add_argument("--config", type=str, required=True, help="Path to YAML config")
+    parser_bench.add_argument("--outdir", type=str, default="reports", help="Output directory")
+
+    # 6. batch
+    parser_batch = subparsers.add_parser("batch", help="Batch processing of multiple targets")
+    parser_batch.add_argument("--targets", type=str, required=True, help="CSV file with target IDs")
+
     args = parser.parse_args()
-    
-    if args.command == "check":
-        print("--- AstroTransit-GPU Environment Check ---")
-        import cupy as cp
-        print(f"CuPy version: {cp.__version__}")
-        try:
-            device = cp.cuda.Device(0)
-            print(f"GPU Device 0: {device.attributes['Name'] if 'Name' in device.attributes else 'Available'}")
-            print(f"Compute Capability: {device.compute_capability}")
-            print(f"Total Memory: {device.mem_info[1] / 1024**3:.2f} GB")
-            print("Status: SUCCESS - GPU is ready.")
-        except Exception as e:
-            print(f"Status: FAILED - {e}")
-        sys.exit(0)
 
-    if args.command == "known":
+    if args.command == "check":
+        import cupy as cp
+        print(f"AstroTransit-GPU v1.0 Check")
+        print(f"CUDA Available: {cp.cuda.is_available()}")
+        if cp.cuda.is_available():
+            dev = cp.cuda.Device()
+            print(f"Device: {dev.id} ({cp.cuda.runtime.getDeviceProperties(dev.id)['name'].decode()})")
+            print(f"Compute Capability: {dev.compute_capability}")
+
+    elif args.command == "search":
         client = LightkurveClient()
-        lc = client.download_lightcurve(args.target, mission=args.mission)
-        lc_clean = clean_lightcurve(lc)
-        time_arr, flux_arr = to_arrays(lc_clean)
-        
-        periods = np.linspace(0.5, 20.0, 1000)
-        durations = np.linspace(0.01, 0.2, 5)
-        
-        print(f"Searching for transits in {args.target}...")
-        results = run_gpu_bls(time_arr, flux_arr, periods, durations)
-        
-        if args.true_p:
-            m = match_candidate(
-                results['best_period'], 
-                results['best_t0'], 
-                args.true_p, 
-                args.true_t0,
-                require_t0=args.true_t0 is not None
-            )
-            results['match'] = m
-            
-        # Extract Top-K
-        results['top_candidates'] = get_top_k_candidates(results, k=5)
-            
-        generate_markdown_report(results, args.out)
-        
-        # New features
-        save_json_report(results, args.out.replace(".md", ".json"))
-        plot_periodogram(periods, results['power'].get(), results['best_period'], "periodogram.png")
-        plot_folded_lightcurve(time_arr, flux_arr, results['best_period'], results['best_t0'], results['best_duration'], "folded_lc.png")
-        
-        print(f"Extended results generated: {args.out}, JSON, and plots.")
-    elif args.command == "batch":
-        from .search.parallel_search import run_hyper_batch_search
-        print(f"Fetching {args.n_targets} targets from NASA Exoplanet Archive...")
-        targets = ExoplanetArchiveClient.get_toi_targets(n_targets=args.n_targets, min_depth_ppm=args.min_depth)
-        
-        target_ids = [t['target_id'] for t in targets]
-        print(f"Starting Hyper-Speed Async Batch Search for {len(target_ids)} stars...")
-        
-        results = run_hyper_batch_search(target_ids)
-        
-        # Post-process results into a DataFrame for report
-        # Match results with targets by target_id since they are asynchronous
-        target_map = {t['target_id']: t for t in targets}
-        summary_results = []
-        for r in results:
-            tid = r['target_id']
-            t = target_map.get(tid)
-            if 'error' in r:
-                summary_results.append({'target_id': tid, 'is_recovered': False, 'error': r['error']})
-            elif t:
-                m = match_candidate(r['best_period'], r['best_t0'], t['period'], t['t0'])
-                summary_results.append({
-                    'target_id': tid,
-                    'true_period': t['period'],
-                    'detected_period': r['best_period'],
-                    'is_recovered': m['is_match'],
-                    'match_type': m['match_type'],
-                    'snr': r['snr']
-                })
-        
-        import pandas as pd
-        df_results = pd.DataFrame(summary_results)
-        generate_batch_report_md(df_results, args.out)
-        print(f"Hyper-Batch report generated: {args.out}")
-    elif args.command == "inject-run":
-        client = LightkurveClient()
-        print(f"Downloading base light curve: {args.target}")
         lc = client.download_lightcurve(args.target)
         lc_clean = clean_lightcurve(lc)
-        time_arr, flux_arr = to_arrays(lc_clean)
+        t, y = to_arrays(lc_clean)
+        dy = lc_clean.flux_err.value if hasattr(lc_clean, 'flux_err') else None
         
-        p_list = [float(p) for p in args.periods.split(",")]
-        d_list = [float(d) for d in args.depths.split(",")]
+        periods = np.linspace(0.5, 20.0, args.n_periods)
+        durations = np.linspace(0.01, 0.2, 5)
         
-        print(f"Starting Injection/Recovery Grid ({len(p_list)}x{len(d_list)} cells, {args.n_trials} trials each)...")
-        df_results = run_injection_recovery_experiment(time_arr, flux_arr, p_list, d_list, n_trials=args.n_trials)
+        print(f"Searching {args.target} ({len(t)} points, {args.n_periods} periods)...")
+        model = BoxLeastSquaresGPU(t, y, dy=dy)
+        dtype = np.float32 if args.precision == "float32" else np.float64
+        res = model.power(periods, durations, dtype=dtype)
         
-        recovery_map = calculate_recovery_map(df_results)
+        print(f"\nBest Result:")
+        print(f"  Period: {res.best_period:.6f} d")
+        print(f"  T0: {res.best_t0:.4f}")
+        print(f"  Depth: {res.best_depth:.4e}")
+        print(f"  SNR/Power: {res.best_power:.2f}")
+
+    elif args.command == "benchmark":
+        import json
+        import os
+        from .validate.plot import plot_comparison, plot_folded_lc
         
-        # Save results
-        md = "# Injection/Recovery Recovery Map\n\n"
-        md += "Values represent recovery probability (0.0 to 1.0).\n\n"
-        md += recovery_map.to_markdown()
-        md += "\n\n## Detailed Trials\n\n"
-        md += df_results.head(20).to_markdown(index=False)
-        
-        with open(args.out, "w", encoding="utf-8") as f:
-            f.write(md)
-        print(f"Injection/Recovery report generated: {args.out}")
-    elif args.command == "run-config":
         with open(args.config, "r") as f:
             cfg = yaml.safe_load(f)
+            
+        target = cfg.get("target", "TIC 261136679")
+        n_periods = cfg.get("n_periods", 5000)
+        n_runs = cfg.get("timed_runs", 5)
+        outdir = args.outdir
+        os.makedirs(outdir, exist_ok=True)
         
-        target = cfg.get('target')
-        mission = cfg.get('mission', 'tess')
         client = LightkurveClient()
-        lc = client.download_lightcurve(target, mission=mission)
+        lc = client.download_lightcurve(target)
         lc_clean = clean_lightcurve(lc)
-        time_arr, flux_arr = to_arrays(lc_clean)
+        t, y = to_arrays(lc_clean)
+        dy = lc_clean.flux_err.value if hasattr(lc_clean, 'flux_err') else None
         
-        search_cfg = cfg.get('search', {})
-        periods = np.linspace(
-            search_cfg.get('period_min', 0.5),
-            search_cfg.get('period_max', 20.0),
-            search_cfg.get('n_periods', 5000)
-        )
-        durations = np.linspace(0.01, 0.2, 5)
+        periods = np.linspace(cfg.get("period_min", 0.5), cfg.get("period_max", 20.0), n_periods)
+        durations = np.array(cfg.get("durations", [0.01, 0.0575, 0.105, 0.1525, 0.2]))
         
-        results = run_gpu_bls(time_arr, flux_arr, periods, durations)
+        print(f"Running Reproducible Benchmark: {cfg.get('benchmark_id', 'standard')}")
         
-        # Generate plots
-        plot_periodogram(periods, results['power'].get(), results['best_period'], "periodogram.png")
-        plot_folded_lightcurve(time_arr, flux_arr, results['best_period'], results['best_t0'], results['best_duration'], "folded_lc.png")
+        # 1. CPU Runs
+        cpu_times = []
+        for i in range(n_runs):
+            s = time.time()
+            cpu_res = run_astropy_bls(t, y, dy=dy, periods=periods, durations=durations)
+            cpu_times.append(time.time() - s)
+            
+        # 2. GPU Runs
+        model = BoxLeastSquaresGPU(t, y, dy=dy)
+        gpu_times = []
+        for i in range(n_runs):
+            s = time.time()
+            gpu_res = model.power(periods, durations, dtype=np.float32)
+            gpu_times.append(time.time() - s)
+            
+        # 3. Analysis
+        cpu_med, gpu_med = np.median(cpu_times), np.median(gpu_times)
+        cpu_p95, gpu_p95 = np.percentile(cpu_times, 95), np.percentile(gpu_times, 95)
+        rmse = np.sqrt(np.mean((cpu_res['power'] - gpu_res.power)**2))
         
-        # Save JSON
-        save_json_report(results, "results.json")
-        print("Run completed from config. Plots and JSON generated.")
+        # 4. JSON Output
+        results_json = {
+            "config": cfg,
+            "statistics": {
+                "cpu_median": cpu_med, "cpu_p95": cpu_p95,
+                "gpu_median": gpu_med, "gpu_p95": gpu_p95,
+                "speedup": cpu_med / gpu_med,
+                "rmse": rmse
+            },
+            "best_parameters": {
+                "period": gpu_res.best_period, "t0": gpu_res.best_t0,
+                "depth": gpu_res.best_depth, "power": gpu_res.best_power
+            }
+        }
+        with open(os.path.join(outdir, "benchmark.json"), "w") as f:
+            json.dump(results_json, f, indent=4)
+            
+        # 5. Plots
+        plot_comparison(periods, cpu_res['power'], gpu_res.power, os.path.join(outdir, "periodogram_comparison.png"))
+        plot_folded_lc(t, y, gpu_res.best_period, gpu_res.best_t0, os.path.join(outdir, "folded_lc.png"))
+        
+        # 6. Markdown Report
+        md = f"""# Benchmark Report: {cfg.get('benchmark_id', 'N/A')}
+- **Target**: {target}
+- **Data Points**: {len(t)}
+- **Date**: {time.strftime("%Y-%m-%d %H:%M:%S")}
+
+## Performance
+| Backend | Median | P95 |
+| :--- | :--- | :--- |
+| CPU (Astropy) | {cpu_med:.4f}s | {cpu_p95:.4f}s |
+| GPU (Ours) | {gpu_med:.4f}s | {gpu_p95:.4f}s |
+| **Speedup** | **{cpu_med/gpu_med:.1f}x** | - |
+
+## Accuracy
+- **Power Spectrum RMSE**: {rmse:.6e}
+- **Best Period (GPU)**: {gpu_res.best_period:.6f} d
+
+![Periodogram Comparison](./periodogram_comparison.png)
+![Folded LC](./folded_lc.png)
+"""
+        with open(os.path.join(outdir, "report.md"), "w") as f:
+            f.write(md)
+            
+        print(f"Benchmark completed. Results in {outdir}/")
+
     elif args.command == "compare":
-        from .search.cpu_reference_bls import run_astropy_bls
-        import time
+        # (Internal logic similar to previous but using BoxLeastSquaresGPU)
         client = LightkurveClient()
         lc = client.download_lightcurve(args.target)
         lc_clean = clean_lightcurve(lc)
-        time_arr, flux_arr = to_arrays(lc_clean)
+        t, y = to_arrays(lc_clean)
+        dy = lc_clean.flux_err.value if hasattr(lc_clean, 'flux_err') else None
         
-        n_periods = args.n_periods
-        if args.preset == "large":
-            n_periods = 100000
-        elif args.preset == "extreme":
-            n_periods = 1000000
-            
+        n_periods = 5000
+        if args.preset == "large": n_periods = 100000
+        elif args.preset == "extreme": n_periods = 1000000
+        
         periods = np.linspace(0.5, 20.0, n_periods)
         durations = np.linspace(0.01, 0.2, 5)
         
-        print(f"Running CPU BLS with {len(periods)} periods...")
-        start = time.time()
-        cpu_res = run_astropy_bls(time_arr, flux_arr, periods=periods, durations=durations)
-        cpu_time = time.time() - start
+        print(f"Benchmarking CPU ({args.n_runs} runs)...")
+        cpu_times = []
+        for i in range(args.n_runs):
+            s = time.time()
+            cpu_res = run_astropy_bls(t, y, dy=dy, periods=periods, durations=durations)
+            cpu_times.append(time.time() - s)
+            
+        print(f"Benchmarking GPU ({args.n_runs} runs)...")
+        model = BoxLeastSquaresGPU(t, y, dy=dy)
+        gpu_times = []
+        for i in range(args.n_runs):
+            s = time.time()
+            gpu_res = model.power(periods, durations)
+            gpu_times.append(time.time() - s)
+            
+        cpu_med, gpu_med = np.median(cpu_times), np.median(gpu_times)
+        rmse = np.sqrt(np.mean((cpu_res['power'] - gpu_res.power)**2))
         
-        import cupy as cp
-        print(f"Running GPU BLS with {len(periods)} periods...")
-        start = time.time()
-        gpu_res = run_gpu_bls(time_arr, flux_arr, periods, durations)
-        cp.cuda.Stream.null.synchronize()
-        gpu_time = time.time() - start
+        report = f"# Parity Report: {args.target}\n"
+        report += f"| Metric | CPU | GPU | Diff/Speedup |\n"
+        report += f"| :--- | :--- | :--- | :--- |\n"
+        report += f"| Runtime (Med) | {cpu_med:.4f}s | {gpu_med:.4f}s | **{cpu_med/gpu_med:.1f}x** |\n"
+        report += f"| Best Period | {cpu_res['period']:.6f} | {gpu_res.best_period:.6f} | {abs(cpu_res['period']-gpu_res.best_period):.2e} |\n"
+        report += f"| Spectrum RMSE | - | - | **{rmse:.4e}** |\n"
         
-        # Phase-aware T0 difference
-        p_avg = (cpu_res['period'] + gpu_res['best_period']) / 2
-        t0_diff_raw = abs(cpu_res['t0'] - gpu_res['best_t0'])
-        t0_diff_phase = t0_diff_raw % p_avg
-        t0_diff_phase = min(t0_diff_phase, p_avg - t0_diff_phase)
+        with open(args.out, "w") as f:
+            f.write(report)
+        print(f"Comparison report written to {args.out}")
 
-        # Report
-        md = "# CPU vs GPU Numerical Comparison\n\n"
-        md += f"| Metric | CPU (Astropy) | GPU (Custom CUDA) | Physical Difference |\n"
-        md += f"| --- | --- | --- | --- |\n"
-        md += f"| Best Period | {cpu_res['period']:.6f} | {gpu_res['best_period']:.6f} | {abs(cpu_res['period']-gpu_res['best_period']):.6e} |\n"
-        md += f"| Best T0 (Phase) | {cpu_res['t0']:.6f} | {gpu_res['best_t0']:.6f} | {t0_diff_phase:.6e} (phase-matched) |\n"
-        md += f"| Runtime | {cpu_time:.4f}s | {gpu_time:.4f}s | x{cpu_time/gpu_time:.1f} faster |\n\n"
+    elif args.command == "inject":
+        client = LightkurveClient()
+        lc = client.download_lightcurve(args.target)
+        lc_clean = clean_lightcurve(lc)
+        t, y = to_arrays(lc_clean)
         
-        md += "*(Note: Best T0 difference is calculated modulo period to account for periodic transits.)*\n"
+        p_list = [float(x) for x in args.periods.split(",")]
+        d_list = [float(x) for x in args.depths.split(",")]
         
-        with open(args.out, "w", encoding="utf-8") as f:
-            f.write(md)
-        print(f"Comparison report generated: {args.out}")
+        print(f"Running Injection Grid ({len(p_list)}x{len(d_list)} cells)...")
+        results_df = run_injection_recovery_experiment(t, y, p_list, d_list, n_trials=args.n_trials)
+        
+        # Simple text heatmap in stdout
+        rec_map = calculate_recovery_map(results_df)
+        print("\nRecovery Map:")
+        print(rec_map)
+        
+        with open(args.out, "w") as f:
+            f.write(f"# Injection Report\n\n{rec_map.to_markdown()}\n")
+        print(f"Injection report written to {args.out}")
+
+    elif args.command == "batch":
+        print(f"Batch processing not yet implemented in v1.0 refactor.")
+
     else:
         parser.print_help()
-        sys.exit(0)
 
 if __name__ == "__main__":
     main()

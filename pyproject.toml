@@ -4,12 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "astrotransit-gpu"
-version = "0.1.0"
+version = "1.0.0"
 description = "High-performance GPU-accelerated transit search platform"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-    "cupy-cuda12x",
     "numpy",
     "astropy",
     "lightkurve",
@@ -19,6 +18,19 @@ dependencies = [
     "pyyaml",
     "tabulate",
     "tqdm",
+]
+
+[project.optional-dependencies]
+cuda12 = ["cupy-cuda12x"]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "ruff",
+    "mypy"
+]
+benchmark = [
+    "tabulate",
+    "tqdm"
 ]
 
 [project.scripts]

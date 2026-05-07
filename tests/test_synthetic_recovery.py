@@ -4,6 +4,7 @@ from astrotransit_gpu.search.gpu_bls import run_gpu_bls
 from astrotransit_gpu.inject.box import inject_box_transit
 from astrotransit_gpu.validate.match import match_candidate
 
+@pytest.mark.gpu
 def test_full_synthetic_recovery():
     # 1. Generate data
     t = np.linspace(0, 20, 5000)
@@ -14,6 +15,7 @@ def test_full_synthetic_recovery():
     true_depth = 0.01
     
     f = inject_box_transit(t, f, true_p, true_t0, true_dur, true_depth)
+    np.random.seed(42)
     f += np.random.normal(0, 0.001, len(t))
     
     # 2. Search

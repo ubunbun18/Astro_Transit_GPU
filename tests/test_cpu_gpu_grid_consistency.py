@@ -4,7 +4,8 @@ from astrotransit_gpu.search.gpu_bls import run_gpu_bls
 from astrotransit_gpu.search.cpu_reference_bls import run_astropy_bls
 from astrotransit_gpu.inject.box import inject_box_transit
 
-def test_grid_parity():
+@pytest.mark.gpu
+def test_grid_consistency():
     # 1. Setup synthetic data
     t = np.linspace(0, 10, 5000)
     f = np.ones_like(t)
