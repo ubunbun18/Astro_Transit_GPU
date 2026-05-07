@@ -56,6 +56,7 @@ def main():
     parser_compare.add_argument("--target", type=str, default="TIC 261136679", help="Target TIC ID")
     parser_compare.add_argument("--out", type=str, default="comparison_report.md", help="Output Markdown report path")
     parser_compare.add_argument("--n-periods", type=int, default=5000, help="Number of periods in grid")
+    parser_compare.add_argument("--preset", choices=["standard", "large", "extreme"], help="Benchmark preset (standard: 5k, large: 100k, extreme: 1M periods)")
     
     args = parser.parse_args()
     
@@ -201,7 +202,13 @@ def main():
         lc_clean = clean_lightcurve(lc)
         time_arr, flux_arr = to_arrays(lc_clean)
         
-        periods = np.linspace(0.5, 20.0, args.n_periods)
+        n_periods = args.n_periods
+        if args.preset == "large":
+            n_periods = 100000
+        elif args.preset == "extreme":
+            n_periods = 1000000
+            
+        periods = np.linspace(0.5, 20.0, n_periods)
         durations = np.linspace(0.01, 0.2, 5)
         
         print(f"Running CPU BLS with {len(periods)} periods...")
@@ -214,13 +221,21 @@ def main():
         gpu_res = run_gpu_bls(time_arr, flux_arr, periods, durations)
         gpu_time = time.time() - start
         
+        # Phase-aware T0 difference
+        p_avg = (cpu_res['period'] + gpu_res['best_period']) / 2
+        t0_diff_raw = abs(cpu_res['t0'] - gpu_res['best_t0'])
+        t0_diff_phase = t0_diff_raw % p_avg
+        t0_diff_phase = min(t0_diff_phase, p_avg - t0_diff_phase)
+
         # Report
         md = "# CPU vs GPU Numerical Comparison\n\n"
-        md += f"| Metric | CPU (Astropy) | GPU (Custom CUDA) | Difference |\n"
+        md += f"| Metric | CPU (Astropy) | GPU (Custom CUDA) | Physical Difference |\n"
         md += f"| --- | --- | --- | --- |\n"
         md += f"| Best Period | {cpu_res['period']:.6f} | {gpu_res['best_period']:.6f} | {abs(cpu_res['period']-gpu_res['best_period']):.6e} |\n"
-        md += f"| Best T0 | {cpu_res['t0']:.6f} | {gpu_res['best_t0']:.6f} | {abs(cpu_res['t0']-gpu_res['best_t0']):.6e} |\n"
+        md += f"| Best T0 (Phase) | {cpu_res['t0']:.6f} | {gpu_res['best_t0']:.6f} | {t0_diff_phase:.6e} (phase-matched) |\n"
         md += f"| Runtime | {cpu_time:.4f}s | {gpu_time:.4f}s | x{cpu_time/gpu_time:.1f} faster |\n\n"
+        
+        md += "*(Note: Best T0 difference is calculated modulo period to account for periodic transits.)*\n"
         
         with open(args.out, "w", encoding="utf-8") as f:
             f.write(md)

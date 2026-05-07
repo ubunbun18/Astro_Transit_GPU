@@ -21,14 +21,14 @@
 
 ## 📊 Performance Benchmarks
 
-Measured on a light curve with 100,000 data points:
+Measured on the current environment (NVIDIA GPU CC 12.0) with 100,000 data points:
 
 | Metric | CPU (Astropy) | GPU (AstroTransit-GPU) | Comparison |
 | :--- | :--- | :--- | :--- |
-| **Execution Time** | 17.32 s (est.) | **0.8237 s** | **~21x Speedup** |
-| **Throughput** | ~5,770 periods/s | **121,402 periods/s** | **Ultra-Dense Search** |
+| **Execution Time (100k periods)** | 17.18 s (est.) | **0.8007 s** | **21.5x Speedup** |
+| **Throughput** | ~5,820 periods/s | **124,897 periods/s** | **Verified** |
 
-*Note: For standard searches (5,000 periods), we observe speedups of up to **73x** (0.10s GPU vs 7.86s CPU).*
+*Note: For smaller searches (5,000 periods), execution time is **0.37s** (GPU) vs **0.81s** (CPU).*
 
 ## 🚀 Installation
 
@@ -82,11 +82,12 @@ astrotransit-gpu compare \
 ```
 
 ### Environment for baseline results:
-- **GPU**: NVIDIA RTX 4090 / H100
+- **GPU**: NVIDIA GPU (Compute Capability 12.0)
+- **VRAM**: 15.93 GB
 - **CUDA**: 12.x
-- **CuPy**: 13.x
-- **OS**: Windows / Linux
-- **Python**: 3.9+
+- **CuPy**: 13.6.0
+- **Python**: 3.12.0
+- **OS**: Windows
 
 ## 📝 License
 
