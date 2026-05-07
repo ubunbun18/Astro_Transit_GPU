@@ -216,9 +216,11 @@ def main():
         cpu_res = run_astropy_bls(time_arr, flux_arr, periods=periods, durations=durations)
         cpu_time = time.time() - start
         
+        import cupy as cp
         print(f"Running GPU BLS with {len(periods)} periods...")
         start = time.time()
         gpu_res = run_gpu_bls(time_arr, flux_arr, periods, durations)
+        cp.cuda.Stream.null.synchronize()
         gpu_time = time.time() - start
         
         # Phase-aware T0 difference

@@ -36,14 +36,16 @@ Measured at the `Standard` preset (5,000 periods) to verify physical consistency
 These results are reproducible using the following configuration:
 
 - **AstroTransit-GPU**: v0.1.0
-- **OS**: Windows 11 / Linux (CUDA enabled)
-- **GPU**: NVIDIA Compute Capability 12.0 (Blackwell Architecture)
-- **CPU**: x86_64 Processor
+- **Commit**: `16643c1`
+- **OS**: Windows 11
+- **GPU**: NVIDIA Compute Capability 12.0 (Blackwell Architecture, 16GB VRAM)
+- **CPU**: AMD Ryzen 7 9700X 8-Core Processor
+- **RAM**: 32 GB (assumed)
 - **Python**: 3.12.0
 - **CuPy**: v13.6.0
 - **Target**: TIC 261136679 (18,257 data points)
 - **Grid Specs**: Period 0.5–20.0 days, 5 Durations, 200 Phase bins
-- **Timing**: Synchronous measurement with `cuda.Stream.synchronize()` after GPU warm-up.
+- **Timing**: Explicit synchronization with `cp.cuda.Stream.null.synchronize()` after GPU warm-up.
 
 ### Reproduction Commands
 ```bash

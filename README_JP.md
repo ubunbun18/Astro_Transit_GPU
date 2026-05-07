@@ -32,8 +32,8 @@ AstroTransit-GPU は、探索グリッドが高密度になるほど、CPU (Astr
 ## 🚀 インストール
 
 ```bash
-git clone https://github.com/ubunbun18/AstroTransit-GPU.git
-cd AstroTransit-GPU
+git clone https://github.com/ubunbun18/Astro_Transit_GPU.git
+cd Astro_Transit_GPU
 pip install .
 ```
 
@@ -48,7 +48,7 @@ pip install .
 | `inject-run` | 信号注入実験を行い、回収率マップを生成。 |
 | `run-config` | YAML 設定ファイルに基づいた実験の実行。 |
 
-詳細なオプションと使用例は [BENCHMARK_REPORT_JP.md](./BENCHMARK_REPORT_JP.md#2-cli-完全リファレンス) に記載されています。
+詳細なオプションと使用例は [BENCHMARK_REPORT_JP.md](./BENCHMARK_REPORT_JP.md) に記載されています。
 
 ## 📋 性能の再現方法
 

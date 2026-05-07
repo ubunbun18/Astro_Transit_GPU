@@ -32,8 +32,8 @@ AstroTransit-GPU demonstrates significant throughput gains over CPU-based implem
 ## 🚀 Installation
 
 ```bash
-git clone https://github.com/ubunbun18/AstroTransit-GPU.git
-cd AstroTransit-GPU
+git clone https://github.com/ubunbun18/Astro_Transit_GPU.git
+cd Astro_Transit_GPU
 pip install .
 ```
 
@@ -48,7 +48,7 @@ pip install .
 | `inject-run` | Perform injection/recovery experiments to evaluate detection limits. |
 | `run-config` | Execute reproducible experiments using YAML configuration files. |
 
-Detailed options and usage examples are available in the [CLI Reference](./BENCHMARK_REPORT.md#3-full-cli-reference).
+Detailed options and usage examples are available in the [CLI Reference](./BENCHMARK_REPORT.md).
 
 ## 📋 Reproducing Benchmarks
 
