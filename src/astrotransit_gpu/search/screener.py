@@ -83,14 +83,18 @@ class GpuScreener:
         
         # Save results
         final_results = []
+        
+        # Move all results to CPU at once for high-speed processing
+        res_cpu = {k: v.get() if hasattr(v, 'get') else v for k, v in results_raw.items()}
+        
         for i in range(n_targets):
             res_row = {
                 "tic_id": int(tic_ids[i]),
-                "period": float(results_raw['best_period'][i]),
-                "t0": float(results_raw['best_t0'][i]),
-                "depth": float(results_raw['best_depth'][i]),
-                "duration": float(results_raw['best_duration'][i]),
-                "power": float(results_raw['snr'][i]),
+                "period": float(res_cpu['best_period'][i]),
+                "t0": float(res_cpu['best_t0'][i]),
+                "depth": float(res_cpu['best_depth'][i]),
+                "duration": float(res_cpu['best_duration'][i]),
+                "power": float(res_cpu['snr'][i]),
                 "n_points": n_pts,
                 "status": "ok",
                 "error": ""
