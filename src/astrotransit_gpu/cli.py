@@ -12,16 +12,42 @@ from .preprocess.clean import clean_lightcurve, to_arrays
 from .search.api import BoxLeastSquaresGPU
 from .search.cpu_reference_bls import run_astropy_bls
 from .inject.grid import run_injection_recovery_experiment, calculate_recovery_map
+from .data.sector_cache import SectorCache
+from .search.screener import GpuScreener
 
 def download_and_preprocess(target_id, data_dir=None, max_retries=2):
-    """Worker function with auto-cleanup for corrupt FITS cache and retry logic."""
+    """
+    Download (if needed) and preprocess a light curve.
+    Checks data_dir for existing files to avoid redundant downloads.
+    """
+    t_start = time.time()
+    
     for attempt in range(max_retries):
-        t_start = time.time()
         try:
-            client = LightkurveClient(cache_dir=data_dir)
-            lc = client.download_lightcurve(str(target_id))
-            t_downloaded = time.time()
+            lc = None
+            t_downloaded = t_start
             
+            # 1. Check for existing file in flat data_dir (from bulk download)
+            target_clean = str(target_id).replace("TIC", "").strip()
+            if data_dir:
+                import glob
+                padded_id = target_clean.zfill(16)
+                matches = glob.glob(os.path.join(data_dir, f"*{padded_id}*.fits"))
+                if matches:
+                    try:
+                        lc = lk.read(matches[0])
+                        t_downloaded = time.time()
+                    except Exception as e:
+                        # If file is corrupt, we'll try to download it via Lightkurve
+                        pass
+
+            # 2. Download via Lightkurve if not found or corrupted
+            if lc is None:
+                client = LightkurveClient(cache_dir=data_dir)
+                lc = client.download_lightcurve(f"TIC {target_clean}")
+                t_downloaded = time.time()
+            
+            # 3. Preprocess
             lc_clean = clean_lightcurve(lc)
             t, y = to_arrays(lc_clean)
             dy = lc_clean.flux_err.value if hasattr(lc_clean, 'flux_err') else None
@@ -38,38 +64,29 @@ def download_and_preprocess(target_id, data_dir=None, max_retries=2):
                 "n_data": len(t),
                 "error": ""
             }
+
         except Exception as e:
             err_msg = str(e)
-            # Detect corruption keywords
-            is_corrupt = "corrupt" in err_msg.lower() or "truncated" in err_msg.lower() or "end of file" in err_msg.lower()
+            is_corrupt = any(k in err_msg.lower() for k in ["corrupt", "truncated", "end of file"])
             
             if is_corrupt and attempt < max_retries - 1:
-                # Attempt to find and delete the corrupt cache file
                 try:
                     import shutil
-                    # Lightkurve default cache path logic
+                    # Cleanup structured cache if it exists
                     cache_base = os.path.expanduser("~/.lightkurve/cache/mastDownload/TESS")
-                    # Search for directory containing the target ID
                     if os.path.exists(cache_base):
                         target_clean = str(target_id).replace("TIC", "").strip().zfill(16)
                         for root, dirs, files in os.walk(cache_base):
                             if target_clean in root:
                                 shutil.rmtree(root)
                                 break
-                except Exception as cleanup_err:
-                    print(f"Warning: Failed to cleanup corrupt cache for {target_id}: {cleanup_err}")
-                
-                # Retry
+                except:
+                    pass
                 continue
             
-            # If not corrupt or last attempt, return failure
             return {
-                "target_id": target_id,
-                "status": "failed",
-                "error": err_msg,
-                "download_time": time.time() - t_start,
-                "preprocess_time": 0,
-                "n_data": 0
+                "target_id": target_id, "status": "failed", "error": err_msg,
+                "download_time": time.time() - t_start, "preprocess_time": 0, "n_data": 0
             }
 
 def main():
@@ -114,6 +131,21 @@ def main():
     parser_batch.add_argument("--workers", type=int, default=4, help="Number of download threads")
     parser_batch.add_argument("--resume", action="store_true", help="Skip targets already in output CSV")
     parser_batch.add_argument("--data-dir", type=str, default=None, help="Local directory for FITS files")
+    parser_batch.add_argument("--n-periods", type=int, default=5000, help="Number of test periods")
+    parser_batch.add_argument("--cpu", action="store_true", help="Use CPU (Astropy) instead of GPU")
+
+    # build-cache command
+    parser_cache = subparsers.add_parser("build-cache", help="Build consolidated binary cache for a sector")
+    parser_cache.add_argument("--fits-dir", type=str, required=True, help="Directory containing FITS files")
+    parser_cache.add_argument("--out-dir", type=str, required=True, help="Directory to save cache")
+    parser_cache.add_argument("--workers", type=int, default=8, help="Number of parsing workers")
+
+    # screen-sector command
+    parser_screen = subparsers.add_parser("screen-sector", help="High-speed screening of a sector using cache")
+    parser_screen.add_argument("--cache-dir", type=str, required=True, help="Directory containing built cache")
+    parser_screen.add_argument("--out", type=str, default="screening_results.csv", help="Output results CSV")
+    parser_screen.add_argument("--n-periods", type=int, default=5000, help="Number of test periods")
+    parser_screen.add_argument("--precision", type=str, choices=["float32", "float64"], default="float32")
 
     args = parser.parse_args()
 
@@ -368,10 +400,11 @@ def main():
             print("All targets already processed.")
             return
 
-        print(f"Batch Analysis: {len(remaining_ids)} remaining, {args.workers} threads.")
+        periods = np.linspace(0.5, 20.0, args.n_periods)
+        durations = np.linspace(0.01, 0.2, 5)
         
-        periods = np.linspace(0.5, 20.0, 5000)
-        durations = [0.05, 0.1, 0.15]
+        backend_name = "CPU" if args.cpu else "GPU"
+        print(f"Batch Analysis ({backend_name}): {len(remaining_ids)} remaining, {args.workers} threads, {args.n_periods} periods.")
         
         fieldnames = ["tic_id", "status", "period", "t0", "depth", "power", "n_data", 
                       "download_time", "preprocess_time", "gpu_time", "total_time", "error"]
@@ -400,13 +433,26 @@ def main():
                         if item['status'] == "ok":
                             try:
                                 gpu_start = time.time()
-                                model = BoxLeastSquaresGPU(item['time_array'], item['flux_array'], dy=item['dy_array'])
-                                res = model.power(periods, durations)
+                                if not args.cpu:
+                                    model = BoxLeastSquaresGPU(item['time_array'], item['flux_array'], dy=item['dy_array'])
+                                    res_obj = model.power(periods, durations)
+                                    best_period = res_obj.best_period
+                                    best_t0 = res_obj.best_t0
+                                    best_depth = res_obj.best_depth
+                                    best_power = res_obj.best_power
+                                else:
+                                    res_dict = run_astropy_bls(item['time_array'], item['flux_array'], dy=item['dy_array'], 
+                                                               periods=periods, durations=durations)
+                                    best_period = res_dict['period']
+                                    best_t0 = res_dict['t0']
+                                    best_depth = res_dict['depth']
+                                    best_power = res_dict['power']
+                                    
                                 gpu_time = time.time() - gpu_start
                                 
                                 res_row.update({
-                                    "period": res.best_period, "t0": res.best_t0,
-                                    "depth": res.best_depth, "power": res.best_power,
+                                    "period": best_period, "t0": best_t0,
+                                    "depth": best_depth, "power": best_power,
                                     "gpu_time": gpu_time,
                                     "total_time": item['download_time'] + item['preprocess_time'] + gpu_time
                                 })
@@ -414,10 +460,27 @@ def main():
                                 res_row.update({"status": "failed", "error": f"GPU Error: {str(e)}", "gpu_time": 0})
                         
                         writer.writerow(res_row)
-                        csvfile.flush() # Ensure it's written to disk
+                        csvfile.flush()
                         pbar.update(1)
 
         print(f"\nBatch analysis complete. Results saved to {args.out}")
+
+    elif args.command == "build-cache":
+        cache = SectorCache(args.out_dir)
+        cache.build(args.fits_dir, workers=args.workers)
+
+    elif args.command == "screen-sector":
+        import pandas as pd
+        cache = SectorCache(args.cache_dir)
+        data = cache.load()
+        
+        periods = np.linspace(0.5, 20.0, args.n_periods)
+        durations = np.linspace(0.01, 0.2, 5)
+        
+        screener = GpuScreener(periods, durations, dtype=np.float32 if args.precision == "float32" else np.float64)
+        results = screener.screen_sector(data, output_path=args.out)
+        
+        print(f"Screening complete. Final results saved to {args.out}")
 
     else:
         parser.print_help()

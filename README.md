@@ -9,7 +9,8 @@
 ## 🌟 Key Features
 
 - **Blazing Fast & Accurate**: Achieves >100x throughput vs. Astropy while maintaining high [correlation (>0.95)](./BENCHMARK_REPORT.md#numerical-parity).
-- **Survey-Scale Pipeline**: Processes **150 targets/minute** (~0.4s/target) using async I/O and parallel preprocessing.
+- **Survey-Scale Pipeline**: Uses a **Flat Binary Cache** system to eliminate disk I/O bottlenecks.
+- **Ultra-High Throughput**: Capable of screening an entire TESS sector (16k targets) with **100k periods in ~30 minutes** (~9 targets/sec).
 - **Astropy-Compatible API**: Features the `BoxLeastSquaresGPU` class for easy integration.
 - **Production-Ready & Robust**: Automated detection and cleanup of corrupt FITS cache with retry logic.
 - **Full Precision Support**: Supports weighted observations (`flux_err`) and `float64` precision.
@@ -59,6 +60,8 @@ print(f"Best Power (SNR): {results.best_power:.2f}")
 | `benchmark` | Automated report generation from YAML configuration files. |
 | `search` | Quick search and result visualization for a single target. |
 | `batch` | Mass analysis for target lists. |
+| `build-cache` | Consolidate thousands of FITS files into a high-speed flat binary. |
+| `screen-sector` | High-speed sector-wide screening using consolidated cache. |
 
 For detailed arguments and usage examples, please refer to the [CLI Reference (docs/CLI_REFERENCE.md)](./docs/CLI_REFERENCE.md).
 

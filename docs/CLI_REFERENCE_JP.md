@@ -104,24 +104,43 @@ astrotransit-gpu benchmark --config config.yaml [--outdir reports] [--gpu-only]
 
 ---
 
-### 6. `batch` — 一括並列解析 (ベータ)
-### `batch`
-多数の天体を一括解析します。非同期 I/O により通信待ちを最小化します。
+### 7. `build-cache` — セクターキャッシュの構築
+大量のバラバラな FITS ファイルを読み込み、前処理（NaN除去、正規化）を済ませた上で、GPU が一気飲みにできる一つの巨大なフラットバイナリファイル（NPZ）に集約します。
 
-```bash
-astrotransit-gpu batch --targets targets.csv [--out results.csv] [--workers 4] [--resume]
-```
-
-- `--targets`: `tic_id` カラムを含む CSV ファイル。
-- `--out`: 結果の保存先 CSV（デフォルト: `batch_results.csv`）。
-- `--workers`: ダウンロードと前処理を行う並列スレッド数（デフォルト: 4）。
-- `--resume`: 保存先 CSV を確認し、すでに `ok` ステータスの天体はスキップします。
-- **堅牢性**: 破損した FITS ファイルを自動検知し、キャッシュを削除して再試行する機能を内蔵しています。
-へのパス。
+- **引数**:
+  - `--fits-dir` (必須): MAST からダウンロードした FITS ファイル群が格納されているディレクトリ。
+  - `--out-dir` (必須): キャッシュファイルの保存先。
+  - `--workers` (Default: 8): FITS パースに使用する CPU 並列数。
 - **使用例**:
   ```bash
-  astrotransit-gpu batch --targets candidate_list.csv
+  astrotransit-gpu build-cache --fits-dir data/tess_sector1 --out-dir data/sector1_cache
   ```
+
+---
+
+### 8. `screen-sector` — 超高速一括スクリーニング
+`build-cache` で作成した集約データを用い、GPU リソースを 100% 活用してセクター内の全天体を一気に解析します。I/O 待ちがほぼゼロになるため、驚異的なスループットを発揮します。
+
+- **引数**:
+  - `--cache-dir` (必須): `build-cache` で作成したディレクトリ。
+  - `--n-periods` (Default: 5000): 周期グリッドの密度。
+  - `--precision` (Default: `float32`): 計算精度。
+  - `--out` (Default: `screening_results.csv`): 結果の保存先。
+- **使用例**:
+  ```bash
+  # 1.6万天体に対して10万周期の超精密探索を30分で実行
+  astrotransit-gpu screen-sector --cache-dir data/sector1_cache --n-periods 100000
+  ```
+
+---
+
+### 💡 Tips: 大量データのダウンロードについて
+MAST 公式の `curl` スクリプトを利用して数万件のデータを一括取得するための補助スクリプトが同梱されています。
+
+```bash
+python scripts/bulk_download_sector.py --script path/to/mast_curl_script.sh --outdir data/tess_sector1 --threads 50
+```
+これにより、標準の `batch` コマンドよりも遥かに高速にデータセットを準備できます。
 
 ---
 

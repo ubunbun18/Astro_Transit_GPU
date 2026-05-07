@@ -53,9 +53,9 @@ def run_gpu_bls(time, flux, periods, durations, flux_err=None, n_bins=200, dtype
     if flux_err is not None and len(flux_err) != len(flux):
         raise ValueError("flux_err must have the same length as flux")
 
-    # Move data to GPU
+    # Move data to GPU if needed
     time_gpu = cp.asarray(time, dtype=dtype)
-    flux_gpu = cp.asarray(flux, dtype=dtype)
+    flux_gpu = cp.asarray(flux, dtype=dtype).copy() # Copy to avoid modifying input if we subtract mean
     
     if flux_err is not None:
         err_gpu = cp.asarray(flux_err, dtype=dtype)
@@ -68,8 +68,18 @@ def run_gpu_bls(time, flux, periods, durations, flux_err=None, n_bins=200, dtype
     w_mean = cp.sum(flux_gpu * weights_gpu) / w_sum
     flux_gpu -= w_mean
 
-    inv_periods_gpu = cp.asarray(1.0 / np.asarray(periods), dtype=dtype)
-    durations_gpu = cp.asarray(durations, dtype=dtype)
+    # Use pre-computed GPU arrays if provided, else transfer
+    if isinstance(periods, cp.ndarray):
+        inv_periods_gpu = 1.0 / periods
+        periods_cpu = periods.get()
+    else:
+        inv_periods_gpu = cp.asarray(1.0 / np.asarray(periods), dtype=dtype)
+        periods_cpu = np.asarray(periods)
+
+    if isinstance(durations, cp.ndarray):
+        durations_gpu = durations
+    else:
+        durations_gpu = cp.asarray(durations, dtype=dtype)
 
     n_data = len(time_gpu)
     n_periods = len(inv_periods_gpu)
@@ -119,7 +129,7 @@ def run_gpu_bls(time, flux, periods, durations, flux_err=None, n_bins=200, dtype
     best_p_idx = int(cp.argmax(power_gpu).item())
     
     return {
-        "best_period": float(periods[best_p_idx]),
+        "best_period": float(periods_cpu[best_p_idx]),
         "best_t0": float(best_t0_gpu[best_p_idx].item()),
         "best_duration": float(best_dur_gpu[best_p_idx].item()),
         "best_depth": float(best_depth_gpu[best_p_idx].item()),
@@ -128,7 +138,7 @@ def run_gpu_bls(time, flux, periods, durations, flux_err=None, n_bins=200, dtype
         "all_t0s": best_t0_gpu,
         "all_durs": best_dur_gpu,
         "all_depths": best_depth_gpu,
-        "periods": np.asarray(periods, dtype=dtype)
+        "periods": periods_cpu
     }
 
 def get_top_k_candidates(results, k=5, min_dist_bins=10):

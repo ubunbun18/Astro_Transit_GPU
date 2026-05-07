@@ -26,7 +26,6 @@ def run_astropy_bls(time, flux, dy=None, periods=None, period_min=0.5, period_ma
         "t0": best_t0,
         "duration": best_duration,
         "depth": best_depth,
-        "power": results.power,
-        "periods": results.period,
+        "power": results.power[best_idx],
         "snr": results.depth_snr[best_idx]
     }

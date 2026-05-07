@@ -121,9 +121,43 @@ astrotransit-gpu batch --targets targets.csv [--out results.csv] [--workers 4] [
   astrotransit-gpu batch --targets candidate_list.csv
   ```
 
+### 7. `build-cache` — Sector Cache Construction
+Parses thousands of FITS files, performs preprocessing (NaN removal, normalization), and consolidates them into a single, high-speed flat binary NPZ file that the GPU can ingest efficiently.
+
+- **Arguments**:
+  - `--fits-dir` (Required): Directory containing raw FITS files downloaded from MAST.
+  - `--out-dir` (Required): Directory to save the cache files.
+  - `--workers` (Default: 8): Number of CPU workers for FITS parsing.
+- **Usage**:
+  ```bash
+  astrotransit-gpu build-cache --fits-dir data/tess_sector1 --out-dir data/sector1_cache
+  ```
+
 ---
 
-## 💡 Tips & Troubleshooting
+### 8. `screen-sector` — Ultra-Fast Sector Screening
+Utilizes the consolidated cache to analyze all targets in a sector at maximum GPU throughput. By eliminating disk I/O bottlenecks, it achieves massive screening speeds.
+
+- **Arguments**:
+  - `--cache-dir` (Required): Directory containing the built cache.
+  - `--n-periods` (Default: 5000): Density of the period grid.
+  - `--precision` (Default: `float32`): Computation precision.
+  - `--out` (Default: `screening_results.csv`): Path to save results.
+- **Usage**:
+  ```bash
+  # Screens 16,000 targets with 100k periods in ~30 minutes
+  astrotransit-gpu screen-sector --cache-dir data/sector1_cache --n-periods 100000
+  ```
+
+---
+
+### 💡 Tips: Bulk Downloads
+For large datasets, we provide a utility script to parse official MAST curl scripts and download data with high concurrency.
+
+```bash
+python scripts/bulk_download_sector.py --script path/to/mast_curl_script.sh --outdir data/tess_sector1 --threads 50
+```
+This is significantly faster than standard `batch` downloads for full-sector datasets.
 
 ### 1. Memory Management
 Large `n_bins` or `N_TILE` can exceed GPU shared memory limits (typically 48KB).
