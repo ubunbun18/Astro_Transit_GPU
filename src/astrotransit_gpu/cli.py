@@ -14,6 +14,7 @@ from .search.cpu_reference_bls import run_astropy_bls
 from .inject.grid import run_injection_recovery_experiment, calculate_recovery_map
 from .data.sector_cache import SectorCache
 from .search.screener import GpuScreener
+import lightkurve as lk
 
 def download_and_preprocess(target_id, data_dir=None, max_retries=2):
     """

@@ -39,23 +39,22 @@ class GpuScreener:
         writer = None
         if output_path:
             out_f = open(output_path, 'w', newline='')
-            writer = csv.DictWriter(out_f, fieldnames=["tic_id", "status", "period", "t0", "power", "error"])
+            writer = csv.DictWriter(out_f, fieldnames=[
+                "tic_id", "status", "period", "t0", "depth", "duration", "power", "n_points", "error"
+            ])
             writer.writeheader()
 
         print(f"Screening {n_targets} targets on GPU...")
         start_total = time.time()
         
         # Loop through targets
-        # Note: Future optimization would batch these into one kernel launch
         for i in tqdm(range(n_targets), desc="Screening"):
             s, e = offsets[i], offsets[i+1]
             t = time_all[s:e]
             y = flux_all[s:e]
             dy = err_all[s:e]
+            n_pts = len(t)
             
-            # Transfer target data to GPU
-            # Using current run_gpu_bls which handles the transfer
-            # We bypass the high-level BoxLeastSquaresGPU for speed
             try:
                 raw_res = run_gpu_bls(
                     t, y, self.periods, self.durations,
@@ -65,7 +64,10 @@ class GpuScreener:
                     "tic_id": int(tic_ids[i]),
                     "period": float(raw_res['best_period']),
                     "t0": float(raw_res['best_t0']),
+                    "depth": float(raw_res['best_depth']),
+                    "duration": float(raw_res['best_duration']),
                     "power": float(raw_res['snr']),
+                    "n_points": n_pts,
                     "status": "ok",
                     "error": ""
                 }
@@ -73,6 +75,7 @@ class GpuScreener:
                 res_row = {
                     "tic_id": int(tic_ids[i]),
                     "status": "error",
+                    "n_points": n_pts,
                     "error": str(ex)
                 }
             

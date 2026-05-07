@@ -28,7 +28,11 @@ def _process_one_fits(fits_path):
             
             # Normalization
             f_med = np.median(f)
-            f = f / f_med - 1.0
+            f_norm = f / f_med - 1.0
+            
+            # Extract flux error
+            fe = data['PDCSAP_FLUX_ERR'][mask]
+            fe_norm = fe / f_med
             
             # Simplified TIC ID extraction
             tic_id = int(hdul[0].header.get('TICID', 0))
@@ -36,8 +40,8 @@ def _process_one_fits(fits_path):
             return {
                 "tic_id": tic_id,
                 "time": t.astype(np.float32),
-                "flux": f.astype(np.float32),
-                "flux_err": np.ones_like(f, dtype=np.float32) * 1e-4, # Simplified for speed
+                "flux": f_norm.astype(np.float32),
+                "flux_err": fe_norm.astype(np.float32),
                 "status": "ok"
             }
     except Exception as e:
@@ -81,8 +85,8 @@ class SectorCache:
         print(f"Saving consolidated cache ({valid_results} targets)...")
         os.makedirs(self.cache_dir, exist_ok=True)
         
-        # Save heavy arrays in NPZ
-        np.savez_compressed(
+        # Save heavy arrays in NPZ (uncompressed for faster loading)
+        np.savez(
             self.data_path,
             time=np.concatenate(all_times),
             flux=np.concatenate(all_fluxes),

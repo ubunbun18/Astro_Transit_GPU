@@ -9,7 +9,7 @@
 ## 🌟 Key Features
 
 - **Blazing Fast & Accurate**: Achieves >100x throughput vs. Astropy while maintaining high [correlation (>0.95)](./BENCHMARK_REPORT.md#numerical-parity).
-- **Survey-Scale Pipeline**: Uses a **Flat Binary Cache** system to eliminate disk I/O bottlenecks.
+- **Survey-Scale Pipeline**: Uses a **Consolidated Sector Cache** system to eliminate disk I/O bottlenecks.
 - **Ultra-High Throughput**: Capable of screening an entire TESS sector (16k targets) with **100k periods in ~30 minutes** (~9 targets/sec).
 - **Astropy-Compatible API**: Features the `BoxLeastSquaresGPU` class for easy integration.
 - **Production-Ready & Robust**: Automated detection and cleanup of corrupt FITS cache with retry logic.

@@ -70,14 +70,15 @@ def run_gpu_bls(time, flux, periods, durations, flux_err=None, n_bins=200, dtype
 
     # Use pre-computed GPU arrays if provided, else transfer
     if isinstance(periods, cp.ndarray):
-        inv_periods_gpu = 1.0 / periods
+        inv_periods_gpu = 1.0 / periods.astype(dtype, copy=False)
         periods_cpu = periods.get()
     else:
-        inv_periods_gpu = cp.asarray(1.0 / np.asarray(periods), dtype=dtype)
-        periods_cpu = np.asarray(periods)
+        periods_np = np.asarray(periods)
+        inv_periods_gpu = cp.asarray(1.0 / periods_np, dtype=dtype)
+        periods_cpu = periods_np
 
     if isinstance(durations, cp.ndarray):
-        durations_gpu = durations
+        durations_gpu = durations.astype(dtype, copy=False)
     else:
         durations_gpu = cp.asarray(durations, dtype=dtype)
 
