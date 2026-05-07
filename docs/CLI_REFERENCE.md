@@ -142,6 +142,7 @@ Utilizes the consolidated cache to analyze all targets in a sector at maximum GP
   - `--cache-dir` (Required): Directory containing the built cache.
   - `--n-periods` (Default: 5000): Density of the period grid.
   - `--precision` (Default: `float32`): Computation precision.
+  - `--blackwell`: Force activation of the **V37 "Apex Predator"** kernel (optimized for Blackwell/Ada).
   - `--out` (Default: `screening_results.csv`): Path to save results.
 - **Usage**:
   ```bash

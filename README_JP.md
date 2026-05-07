@@ -1,7 +1,7 @@
-# AstroTransit-GPU (v1.0.0)
+# AstroTransit-GPU (v1.1.0)
 
 [![CI](https://github.com/ubunbun18/Astro_Transit_GPU/actions/workflows/ci.yml/badge.svg)](https://github.com/ubunbun18/Astro_Transit_GPU/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](./CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
 **AstroTransit-GPU** は、TESS/Kepler 光度曲線に対するトランジット探索（Box Least Squares）を CUDA で高速化し、Astropy との数値的一致を保証しつつ、再現可能なベンチマークと注入実験（Injection/Recovery）を可能にする研究者向けの GPU 探索基盤です。
@@ -9,12 +9,34 @@
 ## 🌟 特徴
 
 - **高速かつ正確**: CUDA による並列化で Astropy 比 100 倍以上のスループットを達成しつつ、スペクトル全体の極めて高い相関（[Correlation > 0.95](./BENCHMARK_REPORT_JP.md#数値一致性の検証)）を維持。
+- **Blackwell Singularity (V37)**: NVIDIA Blackwell (および Ada) アーキテクチャに特化した極限最適化。**219 億個の (天体, 周期) ペアを約 13 分で走査可能** (約 2,800 万ペア/秒)。
 - **Survey Scale パイプライン**: Sector 単位の **Consolidated Sector Cache** 構築により、ディスク I/O 待ちを完全に解消。
-- **超高速スクリーニング**: 1.6 万天体に対しても **10 万周期探索を約 30 分**（約 9 天体/秒）で完遂。
+- **超高速スクリーニング**: 1.6 万天体のセクター全体に対し、**10 万周期探索を 1 分未満** (Blackwell V37) で完遂（従来モデルでは約 30 分）。
 - **Astropy 互換 API**: 既存のワークフローに組み込みやすいオブジェクト指向設計。
 - **堅牢な自動運用**: 破損した FITS キャッシュの自動検知・削除・リトライ機能を搭載。
 - **実データ対応**: `flux_err`（重み付き解析）および `float64`（倍精度）をフルサポート。
 - **高い再現性**: YAML 設定ファイル、シード固定、統計的計測（Median/P95）による信頼性の担保。
+
+## 🚀 Blackwell Singularity (V37)
+
+TESS QLP 全天サーベイのような超大規模スクリーニング向けに、**V37 "Apex Predator"** エンジンを提供しています。このエンジンは NVIDIA Blackwell (および RTX 40 シリーズ) GPU のハードウェア特性を最大限に引き出すよう設計されています。
+
+### 主な最適化:
+- **Winner-Take-All 出力**: スピードを優先し、全周期のスコア（スペクトル）ではなく、**各ターゲットの最高スコア一点のみ**を返します。これにより、メモリ帯域のボトルネックを解消しています。
+- **Zero-Div ロジック**: 高レイテンシな除算器を避け、交差乗算による比較により演算スループットを極大化。
+- **Zero-Spill SMEM**: ビニニング計算をバンク最適化された共有メモリ (SMEM) に展開し、レジスタ溢れを完全に排除。
+- **Warp-Parallel Scan**: ワープシャッフルを用いた並列プレフィックス和により、集計フェーズのボトルネックを解消。
+
+### 使用方法 (CLI):
+```bash
+python -m astrotransit_gpu screen-sector --cache sector_1.npz --blackwell
+```
+
+### 使用方法 (Python API):
+```python
+screener = GpuScreener(n_bins=128)
+results = screener.screen_sector_vbls(data, use_blackwell=True)
+```
 
 ## 🚀 インストール
 

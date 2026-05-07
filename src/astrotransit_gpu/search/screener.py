@@ -16,23 +16,47 @@ class GpuScreener:
         # Precompute constants to avoid redundant kernel work
         self.inv_periods = 1.0 / self.periods
         
-    def screen_sector(self, sector_data, output_path=None):
+    def screen_sector(self, sector_data, output_path=None, batch_size=10000, use_blackwell=False):
         """
         Process an entire sector from SectorCache data.
-        
-        Args:
-            sector_data (dict): Dict containing 'time', 'flux', 'flux_err', 'offsets', 'tic_ids'.
-            output_path (str): Optional path to save results progressively.
+        Automatically detects if data can be vectorized.
         """
-        import csv
-        time_all = sector_data['time']
-        flux_all = sector_data['flux']
-        err_all = sector_data['flux_err']
         offsets = sector_data['offsets']
         tic_ids = sector_data['tic_ids']
-        
-        results = []
         n_targets = len(tic_ids)
+        
+        # Check if all targets have the same length (common for FFI)
+        lengths = np.diff(offsets)
+        if len(np.unique(lengths)) == 1:
+            return self.screen_sector_vbls(sector_data, output_path, batch_size=batch_size, use_blackwell=use_blackwell)
+        else:
+            # Fallback to sequential for ragged data
+            return self._screen_sector_sequential(sector_data, output_path)
+
+    def screen_sector_vbls(self, sector_data, output_path=None, target_batch_size=10000, period_batch_size=10000, use_blackwell=False):
+        """Ultra-fast vectorized screening for uniform-length data (Scales to 1M targets)."""
+        from .vbls import run_vbls_massive
+        import csv
+        
+        tic_ids = sector_data['tic_ids']
+        n_targets = len(tic_ids)
+        
+        if sector_data.get('is_vectorized', False):
+            # V23/V24 Optimized Cache Format
+            common_time = sector_data['time']
+            flux_matrix = sector_data['flux']
+            weights_matrix = 1.0 / (sector_data['flux_err']**2)
+            n_pts = len(common_time)
+        else:
+            # Legacy/Ragged Format - Manual Reshape
+            time_all = cp.asarray(sector_data['time'], dtype=self.dtype)
+            flux_all = cp.asarray(sector_data['flux'], dtype=self.dtype)
+            err_all = cp.asarray(sector_data['flux_err'], dtype=self.dtype)
+            offsets = sector_data['offsets']
+            n_pts = int(np.diff(offsets)[0])
+            common_time = time_all[:n_pts]
+            flux_matrix = flux_all.reshape(n_targets, n_pts)
+            weights_matrix = (1.0 / (err_all * err_all)).reshape(n_targets, n_pts)
         
         # Prepare CSV file
         out_f = None
@@ -44,10 +68,70 @@ class GpuScreener:
             ])
             writer.writeheader()
 
-        print(f"Screening {n_targets} targets on GPU...")
+        print(f"Screening {n_targets} targets and {len(self.periods)} periods using Massive Vectorized GPU BLS...")
         start_total = time.time()
         
-        # Loop through targets
+        # Run massive vBLS
+
+        # Run massive vBLS
+        results_raw = run_vbls_massive(
+            common_time, flux_matrix, self.periods, self.durations,
+            weights_matrix=weights_matrix, n_bins=self.n_bins, dtype=self.dtype,
+            target_batch_size=target_batch_size, period_batch_size=period_batch_size,
+            use_blackwell=use_blackwell
+        )
+        
+        # Save results
+        final_results = []
+        for i in range(n_targets):
+            res_row = {
+                "tic_id": int(tic_ids[i]),
+                "period": float(results_raw['best_period'][i]),
+                "t0": float(results_raw['best_t0'][i]),
+                "depth": float(results_raw['best_depth'][i]),
+                "duration": float(results_raw['best_duration'][i]),
+                "power": float(results_raw['snr'][i]),
+                "n_points": n_pts,
+                "status": "ok",
+                "error": ""
+            }
+            final_results.append(res_row)
+            if writer:
+                writer.writerow(res_row)
+        
+        if out_f:
+            out_f.close()
+
+        end_total = time.time()
+        elapsed = end_total - start_total
+        print(f"\nScreening complete in {elapsed:.2f}s ({n_targets * len(self.periods) / elapsed / 1e9:.2f} G-searches/sec)")
+        
+        return final_results
+
+    def _screen_sector_sequential(self, sector_data, output_path=None):
+        """Original sequential screening logic."""
+        import csv
+        time_all = sector_data['time']
+        flux_all = sector_data['flux']
+        err_all = sector_data['flux_err']
+        offsets = sector_data['offsets']
+        tic_ids = sector_data['tic_ids']
+        
+        results = []
+        n_targets = len(tic_ids)
+        
+        out_f = None
+        writer = None
+        if output_path:
+            out_f = open(output_path, 'w', newline='')
+            writer = csv.DictWriter(out_f, fieldnames=[
+                "tic_id", "status", "period", "t0", "depth", "duration", "power", "n_points", "error"
+            ])
+            writer.writeheader()
+
+        print(f"Screening {n_targets} targets sequentially on GPU...")
+        start_total = time.time()
+        
         for i in tqdm(range(n_targets), desc="Screening"):
             s, e = offsets[i], offsets[i+1]
             t = time_all[s:e]

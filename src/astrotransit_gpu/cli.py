@@ -147,6 +147,7 @@ def main():
     parser_screen.add_argument("--out", type=str, default="screening_results.csv", help="Output results CSV")
     parser_screen.add_argument("--n-periods", type=int, default=5000, help="Number of test periods")
     parser_screen.add_argument("--precision", type=str, choices=["float32", "float64"], default="float32")
+    parser_screen.add_argument("--blackwell", action="store_true", help="Force use of Blackwell-optimized V37 kernel")
 
     args = parser.parse_args()
 
@@ -479,7 +480,7 @@ def main():
         durations = np.linspace(0.01, 0.2, 5)
         
         screener = GpuScreener(periods, durations, dtype=np.float32 if args.precision == "float32" else np.float64)
-        results = screener.screen_sector(data, output_path=args.out)
+        results = screener.screen_sector(data, output_path=args.out, use_blackwell=args.blackwell)
         
         print(f"Screening complete. Final results saved to {args.out}")
 

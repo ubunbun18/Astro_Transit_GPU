@@ -125,6 +125,7 @@ astrotransit-gpu benchmark --config config.yaml [--outdir reports] [--gpu-only]
   - `--cache-dir` (必須): `build-cache` で作成したディレクトリ。
   - `--n-periods` (Default: 5000): 周期グリッドの密度。
   - `--precision` (Default: `float32`): 計算精度。
+  - `--blackwell`: **V37 "Apex Predator"** カーネル（Blackwell/Ada 向け最適化）を強制的に有効化します。
   - `--out` (Default: `screening_results.csv`): 結果の保存先。
 - **使用例**:
   ```bash
