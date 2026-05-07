@@ -1,25 +1,42 @@
-import cupy as cp
 import numpy as np
 import os
-
-# Load CUDA kernel
-KERNEL_FILE = os.path.join(os.path.dirname(__file__), "kernels", "bls.cu")
-with open(KERNEL_FILE, "r") as f:
-    cuda_source = f.read()
 
 # Kernel cache for different precisions
 _kernel_cache = {}
 
-def get_kernel(dtype):
+def _require_cupy():
+    """Lazy import of CuPy to allow CPU-only environments to import the package."""
+    try:
+        import cupy as cp
+        return cp
+    except ImportError as e:
+        raise ImportError(
+            "CuPy is required for GPU acceleration. "
+            "Install with: pip install 'astrotransit-gpu[cuda12]'"
+        ) from e
+
+def get_kernel(dtype, n_tile=4):
+    cp = _require_cupy()
+    
+    # Load CUDA kernel
+    kernel_path = os.path.join(os.path.dirname(__file__), "kernels", "bls.cu")
+    with open(kernel_path, "r") as f:
+        cuda_source = f.read()
+
     dtype_name = np.dtype(dtype).name
-    if dtype_name in _kernel_cache:
-        return _kernel_cache[dtype_name]
+    # Cache key includes n_tile to avoid mismatch
+    cache_key = (dtype_name, n_tile)
+    if cache_key in _kernel_cache:
+        return _kernel_cache[cache_key]
     
     t_type = "double" if "64" in dtype_name else "float"
-    options = (f"-DSCALAR_T={t_type}",)
+    options = (
+        f"-DSCALAR_T={t_type}",
+        f"-DN_TILE={n_tile}",
+    )
     
     kernel = cp.RawKernel(cuda_source, "bls_kernel", options=options)
-    _kernel_cache[dtype_name] = kernel
+    _kernel_cache[cache_key] = kernel
     return kernel
 
 def run_gpu_bls(time, flux, periods, durations, flux_err=None, n_bins=200, dtype=np.float32):
@@ -27,8 +44,8 @@ def run_gpu_bls(time, flux, periods, durations, flux_err=None, n_bins=200, dtype
     Optimized GPU implementation of BLS using a custom CUDA kernel.
     Supports weighted observations and variable precision (float32/float64).
     """
+    cp = _require_cupy()
     dtype = np.dtype(dtype)
-    kernel = get_kernel(dtype)
     
     # 1. Check preconditions
     if len(time) != len(flux):
@@ -36,7 +53,7 @@ def run_gpu_bls(time, flux, periods, durations, flux_err=None, n_bins=200, dtype
     if flux_err is not None and len(flux_err) != len(flux):
         raise ValueError("flux_err must have the same length as flux")
 
-    # Move data to GPU with target precision
+    # Move data to GPU
     time_gpu = cp.asarray(time, dtype=dtype)
     flux_gpu = cp.asarray(flux, dtype=dtype)
     
@@ -65,8 +82,7 @@ def run_gpu_bls(time, flux, periods, durations, flux_err=None, n_bins=200, dtype
     best_depth_gpu = cp.zeros(n_periods, dtype=dtype)
 
     # Kernel configuration
-    N_TILE = 4
-    # threads_per_block must be >= n_bins for the prefix sum and at least power of 2 for reduction
+    n_tile = 4
     threads_per_block = 1
     while threads_per_block < n_bins or threads_per_block < 128:
         threads_per_block *= 2
@@ -74,21 +90,21 @@ def run_gpu_bls(time, flux, periods, durations, flux_err=None, n_bins=200, dtype
     if threads_per_block > 1024:
         raise ValueError(f"n_bins={n_bins} is too large for current kernel implementation (max 1024).")
 
-    blocks_per_grid = (n_periods + N_TILE - 1) // N_TILE
-    
-    # Shared memory size calculation
+    # Shared memory check and dynamic tile reduction
     itemsize = dtype.itemsize
-    shared_mem_size = (N_TILE * n_bins * 2 + threads_per_block * 4) * itemsize
-    
+    shared_mem_size = (n_tile * n_bins * 2 + threads_per_block * 4) * itemsize
     max_shm = cp.cuda.Device().attributes['MaxSharedMemoryPerBlock']
-    if shared_mem_size > max_shm:
-        # Fallback: Reduce N_TILE if shared memory is exceeded
-        while N_TILE > 1 and shared_mem_size > max_shm:
-            N_TILE //= 2
-            shared_mem_size = (N_TILE * n_bins * 2 + threads_per_block * 4) * itemsize
+    
+    while n_tile > 1 and shared_mem_size > max_shm:
+        n_tile //= 2
+        shared_mem_size = (n_tile * n_bins * 2 + threads_per_block * 4) * itemsize
         
-        if shared_mem_size > max_shm:
-            raise MemoryError(f"Shared memory limit exceeded ({shared_mem_size} > {max_shm}). Reduce n_bins.")
+    if shared_mem_size > max_shm:
+        raise MemoryError(f"Shared memory limit exceeded ({shared_mem_size} > {max_shm}). Reduce n_bins.")
+
+    # Get/compile kernel with decided n_tile
+    kernel = get_kernel(dtype, n_tile=n_tile)
+    blocks_per_grid = (n_periods + n_tile - 1) // n_tile
 
     # Launch kernel
     kernel(
@@ -98,7 +114,8 @@ def run_gpu_bls(time, flux, periods, durations, flux_err=None, n_bins=200, dtype
          power_gpu, best_t0_gpu, best_dur_gpu, best_depth_gpu),
         shared_mem=shared_mem_size
     )
-    # Find the best period across all searched periods
+
+    # Find the best period
     best_p_idx = int(cp.argmax(power_gpu).item())
     
     return {
@@ -111,13 +128,10 @@ def run_gpu_bls(time, flux, periods, durations, flux_err=None, n_bins=200, dtype
         "all_t0s": best_t0_gpu,
         "all_durs": best_dur_gpu,
         "all_depths": best_depth_gpu,
-        "periods": np.asarray(periods, dtype=np.float32)
+        "periods": np.asarray(periods, dtype=dtype)
     }
 
 def get_top_k_candidates(results, k=5, min_dist_bins=10):
-    """
-    Extract top-K independent candidates using peak finding.
-    """
     from scipy.signal import find_peaks
     
     power = results['power'].get() if hasattr(results['power'], 'get') else results['power']
@@ -126,7 +140,6 @@ def get_top_k_candidates(results, k=5, min_dist_bins=10):
     if len(peaks) == 0:
         peaks = np.argsort(power)[-k:][::-1]
 
-    # Sort peaks by power
     peak_powers = power[peaks]
     sorted_indices = np.argsort(peak_powers)[::-1]
     top_peaks = peaks[sorted_indices[:k]]

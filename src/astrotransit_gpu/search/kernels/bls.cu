@@ -5,7 +5,9 @@
 #define SCALAR_T float
 #endif
 
+#ifndef N_TILE
 #define N_TILE 4
+#endif
 
 extern "C" __global__ void bls_kernel(
     const SCALAR_T* __restrict__ time,

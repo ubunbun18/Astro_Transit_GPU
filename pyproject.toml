@@ -35,3 +35,9 @@ benchmark = [
 
 [project.scripts]
 astrotransit-gpu = "astrotransit_gpu.cli:main"
+
+[tool.pytest.ini_options]
+markers = [
+    "gpu: tests that require a CUDA-enabled GPU and CuPy",
+    "slow: tests that take a long time to run"
+]

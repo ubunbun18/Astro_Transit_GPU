@@ -51,13 +51,20 @@ def main():
     args = parser.parse_args()
 
     if args.command == "check":
-        import cupy as cp
         print(f"AstroTransit-GPU v1.0 Check")
-        print(f"CUDA Available: {cp.cuda.is_available()}")
-        if cp.cuda.is_available():
-            dev = cp.cuda.Device()
-            print(f"Device: {dev.id} ({cp.cuda.runtime.getDeviceProperties(dev.id)['name'].decode()})")
-            print(f"Compute Capability: {dev.compute_capability}")
+        try:
+            import cupy as cp
+            cuda_available = cp.cuda.is_available()
+            print(f"CUDA Available: {cuda_available}")
+            if cuda_available:
+                dev = cp.cuda.Device()
+                print(f"Device: {dev.id} ({cp.cuda.runtime.getDeviceProperties(dev.id)['name'].decode()})")
+                print(f"Compute Capability: {dev.compute_capability}")
+            else:
+                print("Note: CUDA driver/GPU found, but CUDA is not available to CuPy.")
+        except ImportError:
+            print("CUDA Available: False (CuPy not installed)")
+            print("Install GPU support with: pip install 'astrotransit-gpu[cuda12]'")
 
     elif args.command == "search":
         client = LightkurveClient()
@@ -123,7 +130,11 @@ def main():
         # 3. Analysis
         cpu_med, gpu_med = np.median(cpu_times), np.median(gpu_times)
         cpu_p95, gpu_p95 = np.percentile(cpu_times, 95), np.percentile(gpu_times, 95)
+        
+        # Numerical Consistency Metrics
         rmse = np.sqrt(np.mean((cpu_res['power'] - gpu_res.power)**2))
+        correlation = np.corrcoef(cpu_res['power'], gpu_res.power)[0, 1]
+        period_diff = abs(cpu_res['period'] - gpu_res.best_period)
         
         # 4. JSON Output
         results_json = {
@@ -132,11 +143,16 @@ def main():
                 "cpu_median": cpu_med, "cpu_p95": cpu_p95,
                 "gpu_median": gpu_med, "gpu_p95": gpu_p95,
                 "speedup": cpu_med / gpu_med,
-                "rmse": rmse
+                "rmse": rmse,
+                "power_correlation": correlation,
+                "best_period_diff": period_diff
             },
             "best_parameters": {
-                "period": gpu_res.best_period, "t0": gpu_res.best_t0,
-                "depth": gpu_res.best_depth, "power": gpu_res.best_power
+                "period_gpu": gpu_res.best_period,
+                "period_cpu": cpu_res['period'],
+                "t0_gpu": gpu_res.best_t0,
+                "depth_gpu": gpu_res.best_depth,
+                "power_gpu": gpu_res.best_power
             }
         }
         with open(os.path.join(outdir, "benchmark.json"), "w") as f:
@@ -159,8 +175,10 @@ def main():
 | GPU (Ours) | {gpu_med:.4f}s | {gpu_p95:.4f}s |
 | **Speedup** | **{cpu_med/gpu_med:.1f}x** | - |
 
-## Accuracy
+## Accuracy & Consistency
+- **Power Spectrum Correlation**: {correlation:.6f}
 - **Power Spectrum RMSE**: {rmse:.6e}
+- **Best Period Diff (CPU vs GPU)**: {period_diff:.6f} d
 - **Best Period (GPU)**: {gpu_res.best_period:.6f} d
 
 ![Periodogram Comparison](./periodogram_comparison.png)

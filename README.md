@@ -8,7 +8,7 @@
 
 ## 🌟 Key Features
 
-- **Blazing Fast & Scientifically Accurate**: Achieves >100x throughput vs. Astropy on dense grids while maintaining high correlation (>0.95) with the standard CPU reference.
+- **Blazing Fast & Scientifically Accurate**: Achieves >100x throughput vs. Astropy on dense grids while maintaining high [correlation (>0.95)](./BENCHMARK_REPORT.md#numerical-parity) with the standard CPU reference.
 - **Astropy-Compatible API**: Features the `BoxLeastSquaresGPU` class, making it easy to drop into existing Python workflows.
 - **Production-Ready Core**: Full support for weighted observations (`flux_err`) and variable precision (`float32` / `float64`).
 - **Automated Validation**: Built-in suites for generating Recovery Heatmaps and comprehensive performance reports.

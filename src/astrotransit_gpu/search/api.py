@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 import numpy as np
-import cupy as cp
 from typing import Optional, List, Dict, Any
 from .gpu_bls import run_gpu_bls, get_top_k_candidates
 
@@ -38,9 +37,27 @@ class BoxLeastSquaresGPU:
         """
         Compute the BLS power spectrum.
         """
-        # Data validation
+        # 1. Input Validation
+        periods = np.atleast_1d(periods)
+        durations = np.atleast_1d(durations)
+        
+        if np.any(periods <= 0):
+            raise ValueError("All periods must be positive.")
+        if np.any(durations <= 0):
+            raise ValueError("All durations must be positive.")
+        if np.any(durations >= np.min(periods)):
+            # Warning or Error? Astropy allows it but it's physically weird. 
+            # We'll allow it but ensure n_bins is enough.
+            pass
+            
         if np.any(np.isnan(self.t)) or np.any(np.isnan(self.y)):
             raise ValueError("Input time or flux contains NaNs.")
+            
+        if self.dy is not None:
+            if np.any(self.dy <= 0):
+                raise ValueError("flux_err must be strictly positive for weighted BLS.")
+            if len(self.dy) != len(self.y):
+                raise ValueError("flux_err and flux must have the same length.")
         
         # Run core GPU search
         raw_res = run_gpu_bls(
