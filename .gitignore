@@ -22,16 +22,29 @@ wheels/
 .installed.cfg
 *.egg
 
+# Testing and Caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+*.log
+
 # CUDA / CuPy caches
 .cupy/
 
 # User data and output
-outputs/*.png
-reports/performance/*.md
-reports/validation/*.md
-!reports/validation/massive_batch_50_v2.md
+/data/
+/outputs/
+/reports/
 *.json
 *.png
+*.csv
+!sector1_sample.csv
+!sector1_full.csv
+
+# Astronomy Data
+*.fits
+*.fits.gz
 
 # Environments
 .env
@@ -43,3 +56,8 @@ ENV/
 # IDEs
 .vscode/
 .idea/
+
+# OS specific files
+.DS_Store
+Thumbs.db
+

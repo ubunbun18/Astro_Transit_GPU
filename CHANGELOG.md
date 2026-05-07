@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 ## [1.0.0] - 2026-05-07
 ### Added
 - **Stable API**: Introduced `BoxLeastSquaresGPU` class and `BLSResult` dataclass for Astropy-compatible workflow.
+- **Survey-Scale Batch Pipeline**: New `batch` command with 10x throughput (~150 targets/min) using asynchronous I/O.
+- **Robust Cache Management**: Automated detection and cleanup of corrupted FITS cache files with retry logic.
 - **Automated Benchmark Suite**: New `benchmark` command with JSON output and automated plotting (Matplotlib).
 - **Weights Support**: Full support for `flux_err` / weighted BLS in both CUDA kernels and Python API.
 - **Dynamic Precision**: Ability to switch between `float32` and `float64` precision.

@@ -90,18 +90,32 @@ Automates scientific report generation based on YAML configuration files.
   timed_runs: 5
   durations: [0.01, 0.05, 0.1]
   ```
-- **Usage**:
-  ```bash
-  astrotransit-gpu benchmark --config configs/standard_run.yaml
-  ```
+### `benchmark`
+Generate a reproducible performance report.
+
+```bash
+astrotransit-gpu benchmark --config config.yaml [--outdir reports] [--gpu-only]
+```
+
+- `--config`: Path to the YAML configuration file.
+- `--outdir`: Directory to save the report (default: `reports`).
+- `--gpu-only`: Skip CPU (Astropy) reference runs. Recommended for massive grids.
 
 ---
 
 ### 6. `batch` — Batch Analysis (Beta)
-Process multiple targets sequentially from a target list.
+### `batch`
+Batch process multiple targets using asynchronous I/O to minimize network bottlenecks.
 
-- **Arguments**:
-  - `--targets` (Required): Path to a CSV file containing target IDs.
+```bash
+astrotransit-gpu batch --targets targets.csv [--out results.csv] [--workers 4] [--resume]
+```
+
+- `--targets`: CSV file containing a `tic_id` column.
+- `--out`: Output CSV filename (default: `batch_results.csv`).
+- `--workers`: Number of parallel threads for download and preprocessing (default: 4).
+- `--resume`: Skip targets already marked as `ok` in the output CSV.
+- **Robustness**: Includes automated detection and cleanup of corrupted FITS cache files with automatic retry.
 - **Usage**:
   ```bash
   astrotransit-gpu batch --targets candidate_list.csv

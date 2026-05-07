@@ -4,11 +4,73 @@ import numpy as np
 import time
 import yaml
 import pandas as pd
+import os
+import csv
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from .data.lightkurve_client import LightkurveClient
 from .preprocess.clean import clean_lightcurve, to_arrays
 from .search.api import BoxLeastSquaresGPU
 from .search.cpu_reference_bls import run_astropy_bls
 from .inject.grid import run_injection_recovery_experiment, calculate_recovery_map
+
+def download_and_preprocess(target_id, data_dir=None, max_retries=2):
+    """Worker function with auto-cleanup for corrupt FITS cache and retry logic."""
+    for attempt in range(max_retries):
+        t_start = time.time()
+        try:
+            client = LightkurveClient(cache_dir=data_dir)
+            lc = client.download_lightcurve(str(target_id))
+            t_downloaded = time.time()
+            
+            lc_clean = clean_lightcurve(lc)
+            t, y = to_arrays(lc_clean)
+            dy = lc_clean.flux_err.value if hasattr(lc_clean, 'flux_err') else None
+            t_preprocessed = time.time()
+            
+            return {
+                "target_id": target_id,
+                "status": "ok",
+                "time_array": t,
+                "flux_array": y,
+                "dy_array": dy,
+                "download_time": t_downloaded - t_start,
+                "preprocess_time": t_preprocessed - t_downloaded,
+                "n_data": len(t),
+                "error": ""
+            }
+        except Exception as e:
+            err_msg = str(e)
+            # Detect corruption keywords
+            is_corrupt = "corrupt" in err_msg.lower() or "truncated" in err_msg.lower() or "end of file" in err_msg.lower()
+            
+            if is_corrupt and attempt < max_retries - 1:
+                # Attempt to find and delete the corrupt cache file
+                try:
+                    import shutil
+                    # Lightkurve default cache path logic
+                    cache_base = os.path.expanduser("~/.lightkurve/cache/mastDownload/TESS")
+                    # Search for directory containing the target ID
+                    if os.path.exists(cache_base):
+                        target_clean = str(target_id).replace("TIC", "").strip().zfill(16)
+                        for root, dirs, files in os.walk(cache_base):
+                            if target_clean in root:
+                                shutil.rmtree(root)
+                                break
+                except Exception as cleanup_err:
+                    print(f"Warning: Failed to cleanup corrupt cache for {target_id}: {cleanup_err}")
+                
+                # Retry
+                continue
+            
+            # If not corrupt or last attempt, return failure
+            return {
+                "target_id": target_id,
+                "status": "failed",
+                "error": err_msg,
+                "download_time": time.time() - t_start,
+                "preprocess_time": 0,
+                "n_data": 0
+            }
 
 def main():
     parser = argparse.ArgumentParser(description="AstroTransit-GPU v1.0: High-performance Transit Search Platform")
@@ -43,10 +105,15 @@ def main():
     parser_bench = subparsers.add_parser("benchmark", help="Run reproducible benchmark from config")
     parser_bench.add_argument("--config", type=str, required=True, help="Path to YAML config")
     parser_bench.add_argument("--outdir", type=str, default="reports", help="Output directory")
+    parser_bench.add_argument("--gpu-only", action="store_true", help="Skip CPU reference runs")
 
     # 6. batch
     parser_batch = subparsers.add_parser("batch", help="Batch processing of multiple targets")
     parser_batch.add_argument("--targets", type=str, required=True, help="CSV file with target IDs")
+    parser_batch.add_argument("--out", type=str, default="batch_results.csv")
+    parser_batch.add_argument("--workers", type=int, default=4, help="Number of download threads")
+    parser_batch.add_argument("--resume", action="store_true", help="Skip targets already in output CSV")
+    parser_batch.add_argument("--data-dir", type=str, default=None, help="Local directory for FITS files")
 
     args = parser.parse_args()
 
@@ -89,7 +156,6 @@ def main():
 
     elif args.command == "benchmark":
         import json
-        import os
         from .validate.plot import plot_comparison, plot_folded_lc
         
         with open(args.config, "r") as f:
@@ -114,12 +180,18 @@ def main():
         
         # 1. CPU Runs
         cpu_times = []
-        for i in range(n_runs):
-            s = time.time()
-            cpu_res = run_astropy_bls(t, y, dy=dy, periods=periods, durations=durations)
-            cpu_times.append(time.time() - s)
+        cpu_res = None
+        if not args.gpu_only:
+            print(f"Benchmarking CPU (Astropy)... This may take a while for large grids.")
+            for i in range(n_runs):
+                s = time.time()
+                cpu_res = run_astropy_bls(t, y, dy=dy, periods=periods, durations=durations)
+                cpu_times.append(time.time() - s)
+        else:
+            print(f"Skipping CPU benchmark (--gpu-only)")
             
         # 2. GPU Runs
+        print(f"Benchmarking GPU (AstroTransit-GPU)...")
         model = BoxLeastSquaresGPU(t, y, dy=dy)
         gpu_times = []
         for i in range(n_runs):
@@ -128,13 +200,19 @@ def main():
             gpu_times.append(time.time() - s)
             
         # 3. Analysis
-        cpu_med, gpu_med = np.median(cpu_times), np.median(gpu_times)
-        cpu_p95, gpu_p95 = np.percentile(cpu_times, 95), np.percentile(gpu_times, 95)
+        cpu_med = np.median(cpu_times) if cpu_times else 0.0
+        gpu_med = np.median(gpu_times)
+        cpu_p95 = np.percentile(cpu_times, 95) if cpu_times else 0.0
+        gpu_p95 = np.percentile(gpu_times, 95)
         
-        # Numerical Consistency Metrics
-        rmse = np.sqrt(np.mean((cpu_res['power'] - gpu_res.power)**2))
-        correlation = np.corrcoef(cpu_res['power'], gpu_res.power)[0, 1]
-        period_diff = abs(cpu_res['period'] - gpu_res.best_period)
+        # Numerical Consistency Metrics (only if CPU ran)
+        rmse = 0.0
+        correlation = 0.0
+        period_diff = 0.0
+        if cpu_res is not None:
+            rmse = np.sqrt(np.mean((cpu_res['power'] - gpu_res.power)**2))
+            correlation = np.corrcoef(cpu_res['power'], gpu_res.power)[0, 1]
+            period_diff = abs(cpu_res['period'] - gpu_res.best_period)
         
         # 4. JSON Output
         results_json = {
@@ -142,14 +220,14 @@ def main():
             "statistics": {
                 "cpu_median": cpu_med, "cpu_p95": cpu_p95,
                 "gpu_median": gpu_med, "gpu_p95": gpu_p95,
-                "speedup": cpu_med / gpu_med,
+                "speedup": cpu_med / gpu_med if cpu_med > 0 else 0.0,
                 "rmse": rmse,
                 "power_correlation": correlation,
                 "best_period_diff": period_diff
             },
             "best_parameters": {
                 "period_gpu": gpu_res.best_period,
-                "period_cpu": cpu_res['period'],
+                "period_cpu": cpu_res['period'] if cpu_res else None,
                 "t0_gpu": gpu_res.best_t0,
                 "depth_gpu": gpu_res.best_depth,
                 "power_gpu": gpu_res.best_power
@@ -159,10 +237,21 @@ def main():
             json.dump(results_json, f, indent=4)
             
         # 5. Plots
-        plot_comparison(periods, cpu_res['power'], gpu_res.power, os.path.join(outdir, "periodogram_comparison.png"))
+        plot_comparison(periods, cpu_res['power'] if cpu_res else np.zeros_like(gpu_res.power), gpu_res.power, os.path.join(outdir, "periodogram_comparison.png"))
         plot_folded_lc(t, y, gpu_res.best_period, gpu_res.best_t0, os.path.join(outdir, "folded_lc.png"))
         
         # 6. Markdown Report
+        cpu_info = f"| CPU (Astropy) | {cpu_med:.4f}s | {cpu_p95:.4f}s |" if not args.gpu_only else "| CPU (Astropy) | Skipped | Skipped |"
+        speedup_info = f"| **Speedup** | **{cpu_med/gpu_med:.1f}x** | - |" if not args.gpu_only else "| **Speedup** | N/A | - |"
+        
+        consistency_info = ""
+        if not args.gpu_only:
+            consistency_info = f"""
+- **Power Spectrum Correlation**: {correlation:.6f}
+- **Power Spectrum RMSE**: {rmse:.6e}
+- **Best Period Diff (CPU vs GPU)**: {period_diff:.6f} d
+- """
+            
         md = f"""# Benchmark Report: {cfg.get('benchmark_id', 'N/A')}
 - **Target**: {target}
 - **Data Points**: {len(t)}
@@ -171,14 +260,12 @@ def main():
 ## Performance
 | Backend | Median | P95 |
 | :--- | :--- | :--- |
-| CPU (Astropy) | {cpu_med:.4f}s | {cpu_p95:.4f}s |
+{cpu_info}
 | GPU (Ours) | {gpu_med:.4f}s | {gpu_p95:.4f}s |
-| **Speedup** | **{cpu_med/gpu_med:.1f}x** | - |
+{speedup_info}
 
 ## Accuracy & Consistency
-- **Power Spectrum Correlation**: {correlation:.6f}
-- **Power Spectrum RMSE**: {rmse:.6e}
-- **Best Period Diff (CPU vs GPU)**: {period_diff:.6f} d
+{consistency_info}
 - **Best Period (GPU)**: {gpu_res.best_period:.6f} d
 
 ![Periodogram Comparison](./periodogram_comparison.png)
@@ -190,7 +277,6 @@ def main():
         print(f"Benchmark completed. Results in {outdir}/")
 
     elif args.command == "compare":
-        # (Internal logic similar to previous but using BoxLeastSquaresGPU)
         client = LightkurveClient()
         lc = client.download_lightcurve(args.target)
         lc_clean = clean_lightcurve(lc)
@@ -245,7 +331,6 @@ def main():
         print(f"Running Injection Grid ({len(p_list)}x{len(d_list)} cells)...")
         results_df = run_injection_recovery_experiment(t, y, p_list, d_list, n_trials=args.n_trials)
         
-        # Simple text heatmap in stdout
         rec_map = calculate_recovery_map(results_df)
         print("\nRecovery Map:")
         print(rec_map)
@@ -255,7 +340,84 @@ def main():
         print(f"Injection report written to {args.out}")
 
     elif args.command == "batch":
-        print(f"Batch processing not yet implemented in v1.0 refactor.")
+        from tqdm import tqdm
+        
+        if not os.path.exists(args.targets):
+            print(f"Error: Target list {args.targets} not found.")
+            return
+
+        targets_df = pd.read_csv(args.targets)
+        target_ids = targets_df['tic_id'].unique().tolist()
+        
+        # Resume logic
+        processed_ids = set()
+        file_exists = os.path.exists(args.out)
+        if args.resume and file_exists:
+            try:
+                old_df = pd.read_csv(args.out)
+                if 'tic_id' in old_df.columns and 'status' in old_df.columns:
+                    # Only skip successful ones
+                    processed_ids = set(old_df.loc[old_df['status'] == 'ok', 'tic_id'].unique().tolist())
+                    print(f"Resuming: skipping {len(processed_ids)} successful targets.")
+            except Exception:
+                pass
+        
+        remaining_ids = [tid for tid in target_ids if tid not in processed_ids]
+        
+        if not remaining_ids:
+            print("All targets already processed.")
+            return
+
+        print(f"Batch Analysis: {len(remaining_ids)} remaining, {args.workers} threads.")
+        
+        periods = np.linspace(0.5, 20.0, 5000)
+        durations = [0.05, 0.1, 0.15]
+        
+        fieldnames = ["tic_id", "status", "period", "t0", "depth", "power", "n_data", 
+                      "download_time", "preprocess_time", "gpu_time", "total_time", "error"]
+
+        # Open file in append mode
+        mode = 'a' if args.resume and file_exists else 'w'
+        with open(args.out, mode, newline='') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            if mode == 'w':
+                writer.writeheader()
+            
+            with ThreadPoolExecutor(max_workers=args.workers) as executor:
+                future_to_tid = {executor.submit(download_and_preprocess, tid, data_dir=args.data_dir): tid for tid in remaining_ids}
+                
+                with tqdm(total=len(remaining_ids), desc="Processing") as pbar:
+                    for future in as_completed(future_to_tid):
+                        item = future.result()
+                        tid = item['target_id']
+                        
+                        res_row = {
+                            "tic_id": tid, "status": item['status'],
+                            "download_time": item['download_time'], "preprocess_time": item['preprocess_time'],
+                            "n_data": item['n_data'], "error": item['error']
+                        }
+                        
+                        if item['status'] == "ok":
+                            try:
+                                gpu_start = time.time()
+                                model = BoxLeastSquaresGPU(item['time_array'], item['flux_array'], dy=item['dy_array'])
+                                res = model.power(periods, durations)
+                                gpu_time = time.time() - gpu_start
+                                
+                                res_row.update({
+                                    "period": res.best_period, "t0": res.best_t0,
+                                    "depth": res.best_depth, "power": res.best_power,
+                                    "gpu_time": gpu_time,
+                                    "total_time": item['download_time'] + item['preprocess_time'] + gpu_time
+                                })
+                            except Exception as e:
+                                res_row.update({"status": "failed", "error": f"GPU Error: {str(e)}", "gpu_time": 0})
+                        
+                        writer.writerow(res_row)
+                        csvfile.flush() # Ensure it's written to disk
+                        pbar.update(1)
+
+        print(f"\nBatch analysis complete. Results saved to {args.out}")
 
     else:
         parser.print_help()

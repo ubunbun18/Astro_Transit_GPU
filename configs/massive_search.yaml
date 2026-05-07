@@ -1,0 +1,9 @@
+benchmark_id: "MASSIVE_10M_PERIOD_SEARCH"
+target: "TIC 261136679"
+period_min: 0.5            # Fixed to avoid Astropy validation error
+period_max: 100.0
+n_periods: 10000000        # 10 Million periods
+timed_runs: 1              # Only 1 run for massive scale to save time
+durations: [0.01, 0.05, 0.1, 0.15, 0.2]
+n_bins: 500
+precision: "float32"

@@ -91,18 +91,33 @@ YAML 設定ファイルに基づき、論文や報告書に使用できる詳細
   timed_runs: 5
   durations: [0.01, 0.05, 0.1]
   ```
-- **使用例**:
-  ```bash
-  astrotransit-gpu benchmark --config configs/standard_run.yaml --outdir output/results
-  ```
+### `benchmark`
+再現可能な性能レポートを生成します。
+
+```bash
+astrotransit-gpu benchmark --config config.yaml [--outdir reports] [--gpu-only]
+```
+
+- `--config`: YAML 設定ファイルのパス。
+- `--outdir`: レポート出力先ディレクトリ（デフォルト: `reports`）。
+- `--gpu-only`: CPU (Astropy) での比較計測をスキップします。超大規模探索時に推奨。
 
 ---
 
 ### 6. `batch` — 一括並列解析 (ベータ)
-ターゲットリストに基づき、複数の天体を連続してダウンロード・解析します。
+### `batch`
+多数の天体を一括解析します。非同期 I/O により通信待ちを最小化します。
 
-- **引数**:
-  - `--targets` (必須): TIC ID が記載された CSV ファイルへのパス。
+```bash
+astrotransit-gpu batch --targets targets.csv [--out results.csv] [--workers 4] [--resume]
+```
+
+- `--targets`: `tic_id` カラムを含む CSV ファイル。
+- `--out`: 結果の保存先 CSV（デフォルト: `batch_results.csv`）。
+- `--workers`: ダウンロードと前処理を行う並列スレッド数（デフォルト: 4）。
+- `--resume`: 保存先 CSV を確認し、すでに `ok` ステータスの天体はスキップします。
+- **堅牢性**: 破損した FITS ファイルを自動検知し、キャッシュを削除して再試行する機能を内蔵しています。
+へのパス。
 - **使用例**:
   ```bash
   astrotransit-gpu batch --targets candidate_list.csv
