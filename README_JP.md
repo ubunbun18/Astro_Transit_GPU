@@ -3,32 +3,31 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![CUDA 12.x](https://img.shields.io/badge/CUDA-12.x-green.svg)](https://developer.nvidia.com/cuda-toolkit)
-[![Numerical Parity](https://img.shields.io/badge/Numerical_Parity-Verified-brightgreen.svg)](#scientific-validation)
 
-**AstroTransit-GPU** は、TESS や Kepler などの時系列光度データから惑星トランジットを探索するための、究極に最適化された GPU 加速プラットフォームです。独自の CUDA カーネルと非同期処理パイプラインにより、大規模な系外惑星サーベイにおいて世界トップクラスのスループットを実現します。
+**AstroTransit-GPU** は、TESS や Kepler などの時系列光度データから惑星トランジットを探索するための、CUDA 加速プラットフォームです。独自の CUDA カーネルによる並列演算と非同期処理パイプラインにより、大規模な系外惑星サーベイにおける探索スループットを最大化します。
 
-## 🔬 技術的ハイライト
+## 🔬 技術的特徴
 
--   **Hyper-Optimized CUDA Kernel**: 
-    - **8周期タイリング (8-Period Tiling)**: 1回のメモリ読み込みで8つの周期を同時に処理し、メモリ帯域を最大限に活用。
-    - **並列スキャン & 探索**: スライディングウィンドウ探索を、並列累積和を用いてブロック内の全スレッド（256個）で実行。
-    - **除算フリーな位相計算**: 高コストな除算を、事前に計算された逆数を用いた高速な乗算処理に置換。
--   **非同期処理パイプライン**:
-    - `ProcessPoolExecutor` による I/O と CPU 前処理（ダウンロード、クリーニング）の同時並列実行。
-    - `CUDA Streams` による GPU カーネル実行の多重化とオーバーラップ。
--   **科学的妥当性の確保**:
-    - `astropy.timeseries.BoxLeastSquares` との比較検証済み（検出周期の典型的な誤差 < 0.04%）。
+-   **並列 BLS カーネル**: 
+    - **周期タイリング**: 1回のメモリ読み込みで複数の周期を並列処理し、スループットを向上。
+    - **並列累積和探索**: スレッド間通信を利用した高速なスライディングウィンドウ探索。
+-   **非同期データ処理**:
+    - `ProcessPoolExecutor` による CPU 前処理（ダウンロード・クリーニング）と GPU 演算のオーバーラップ。
+-   **数値的一致の検証**:
+    - 業界標準の `astropy.timeseries.BoxLeastSquares` と同一の探索グリッド上で比較検証を行い、科学的な整合性を確保。
 
-## 📊 ベンチマーク結果
+## 📊 パフォーマンスと信頼性
 
-現在の実行環境（NVIDIA GPU CC 12.0）における、100,000 データポイントでの計測結果：
+AstroTransit-GPU は、探索グリッドが高密度になるほど、CPU (Astropy) に対するスループットの優位性が拡大します。
 
-| 指標 | CPU (Astropy) | GPU (AstroTransit-GPU) | 比較 |
-| :--- | :--- | :--- | :--- |
-| **実行時間 (10万周期)** | 17.18 秒 (推定) | **0.8007 秒** | **21.5 倍高速** |
-| **スループット** | ~5,820 周期/秒 | **124,897 周期/秒** | **実測値** |
+| 探索規模 | 周期グリッド数 | 加速倍率 (CPU比) |
+| :--- | :--- | :--- |
+| **Standard** | 5,000 | 約 7.5倍 |
+| **Large** | 100,000 | 約 79倍 |
+| **Extreme** | 1,000,000 | **130倍以上** |
 
-*注: 小規模な探索（5,000周期）では、実行時間 **0.37秒**（GPU）vs **0.81秒**（CPU）となっています。*
+> [!NOTE]
+> 詳細な測定条件、数値的な一致度（精度）、および再現コマンドについては、[BENCHMARK_REPORT_JP.md](./BENCHMARK_REPORT_JP.md) を参照してください。
 
 ## 🚀 インストール
 
@@ -38,59 +37,31 @@ cd AstroTransit-GPU
 pip install .
 ```
 
-## 🛠️ CLI コマンドリファレンス
+## 🛠️ CLI コマンド
 
 | コマンド | 説明 |
 | :--- | :--- |
 | `check` | GPU の可用性と CUDA 環境を診断。 |
-| `known` | 特定の既知ターゲットに対する探索と詳細レポート生成。 |
+| `compare` | CPU と GPU の速度・精度を直接比較。 |
+| `known` | 特定の既知ターゲットに対する探索とレポート生成。 |
 | `batch` | NASA カタログからターゲットを一括取得し、非同期並列解析。 |
-| `inject-run` | 信号注入実験を行い、感度（回収率）マップを生成。 |
-| `run-config` | YAML 設定ファイルに基づいた再現可能な実験の実行。 |
+| `inject-run` | 信号注入実験を行い、回収率マップを生成。 |
+| `run-config` | YAML 設定ファイルに基づいた実験の実行。 |
 
-### 実行例
+詳細なオプションと使用例は [BENCHMARK_REPORT_JP.md](./BENCHMARK_REPORT_JP.md#2-cli-完全リファレンス) に記載されています。
 
-```bash
-# 環境チェック
-astrotransit-gpu check
-
-# 50個の TOI を一括解析
-astrotransit-gpu batch --n-targets 50 --out reports/batch_report.md
-
-# 人工信号注入実験
-astrotransit-gpu inject-run --target "TIC 261136679" --periods "2.0,5.0,10.0" --depths "0.001,0.003"
-```
-
-## 🧪 科学的検証 (Scientific Validation)
-
-本システムの GPU BLS 実装はフェーズ・ビン詰め（Phase-binning）による近似アルゴリズムを使用しています。業界標準の `astropy.timeseries.BoxLeastSquares` と数値的に比較検証されており、一貫した惑星検出能力を確認済みです。
-
-| パラメータ | Astropy (CPU) | AstroTransit-GPU | 誤差 |
-| :--- | :--- | :--- | :--- |
-| **検出周期** | 6.268017 d | 6.265353 d | 2.66e-3 d |
-| **探索グリッド** | `linspace` | `linspace` | 完全一致 |
-
-## 📋 ベンチマークの再現方法
+## 📋 性能の再現方法
 
 お使いの環境で性能を測定するには、以下のコマンドを実行してください：
 
 ```bash
-astrotransit-gpu compare \
-  --target "TIC 261136679" \
-  --n-periods 5000 \
-  --out reports/performance/repro_benchmark.md
+# 標準解像度での比較
+astrotransit-gpu compare --preset standard
 ```
-
-### 測定環境（リファレンス）:
-- **GPU**: NVIDIA GPU (Compute Capability 12.0)
-- **VRAM**: 15.93 GB
-- **CUDA**: 12.x
-- **CuPy**: 13.6.0
-- **Python**: 3.12.0
-- **OS**: Windows
 
 ## 📝 ライセンス
 
 MIT License。詳細は `LICENSE` ファイルを参照してください。
 
 ---
+*Scaling Exoplanet Discovery with Reliability.*

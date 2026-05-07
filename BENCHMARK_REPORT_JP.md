@@ -1,83 +1,90 @@
 # AstroTransit-GPU 高速探索・完全活用ガイド
-## 〜 100倍速の宇宙探査：ベンチマーク ＆ CLIリファレンス 〜
+## 〜 探索効率の最大化と数値精度の検証報告 〜
 
-AstroTransit-GPU は、CUDA カーネルを極限まで最適化することで、従来の CPU ベースの解析を圧倒するスピードで惑星探査を可能にします。このドキュメントでは、その驚異的な性能データと、全機能を使いこなすための CLI リファレンスを網羅しています。
-
----
-
-## 1. パフォーマンス・ベンチマーク（実測値）
-
-NVIDIA GPU（Blackwell / RTX シリーズ）環境での、CPU（Astropy BLS）との直接比較データです。
-
-| 探索スケール | 周期グリッド数 | CPU (Astropy) | GPU (Ours) | 高速化倍率 | 推奨用途 |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **Standard** | 5,000 | ~0.85秒 | **0.04秒** | **約 21倍** | クイックチェック |
-| **Large** | 100,000 | 16.86秒 | **0.21秒** | **約 79倍** | 標準的な個別解析 |
-| **Extreme** | 1,000,000 | 159.10秒 | **1.21秒** | **約 131倍** | 超高密度・全天探索 |
-
-> [!IMPORTANT]
-> 探索規模が大きくなるほど、GPU の並列演算ユニットが効率的に活用され、**100倍以上のパフォーマンス・アドバンテージ**が得られます。
+AstroTransit-GPU は、CUDA カーネルによる BLS (Box Least Squares) アルゴリズムを実装し、Astropy を基準とした高い数値精度と、大規模データに対するスループットの向上を両立したトランジット探索ツールです。
 
 ---
 
-## 2. CLI 完全リファレンス
+## 1. パフォーマンス・ベンチマーク報告
 
-すべてのコマンドとオプションの詳細です。
+本システムのスケーラビリティを検証するため、同一の探索グリッド条件下で Astropy (CPU) との実行速度を比較しました。
 
-### 1️⃣ `check`：環境の健全性確認
-GPU が正しく認識されているか、計算能力（Compute Capability）が十分かを確認します。
-- **使用例**: `astrotransit-gpu check`
-- **引数**: なし
+### 実行速度の比較
+| 解析スケール | 周期グリッド数 | CPU (Astropy) | GPU (Ours) | 高速化倍率 | 
+| :--- | :--- | :--- | :--- | :--- |
+| **Standard** | 5,000 | ~0.83秒 | **0.11秒** | **約 7.5倍** |
+| **Large** | 100,000 | 16.86秒 | **0.21秒** | **約 79倍** |
+| **Extreme** | 1,000,000 | 159.10秒 | **1.21秒** | **約 131倍** |
 
-### 2️⃣ `compare`：CPU vs GPU 性能比較
-現在の環境でどれだけの速度向上が得られるか、また数値的な一致度を検証します。
-- **使用例**: `astrotransit-gpu compare --preset large --out my_bench.md`
-- **オプション**:
-    - `--target` : 解析対象の TIC ID (デフォルト: "TIC 261136679")
-    - `--n-periods` : 手動で指定する周期グリッド数 (デフォルト: 5000)
-    - `--preset` : 高速設定 [`standard` (5k), `large` (100k), `extreme` (1M)]
-    - `--out` : 結果レポートの保存先 (デフォルト: "comparison_report.md")
+> [!NOTE]
+> 探索規模（周期グリッド数）が拡大するほど GPU の並列演算スロットが効率的に埋まり、100万周期を超える探索では **130倍以上** のスループットを達成します。
 
-### 3️⃣ `known`：既知の惑星の再検出
-カタログに載っている既知の惑星を検出し、その精度を検証します。
-- **使用例**: `astrotransit-gpu known --target "TIC 261136679" --true-p 6.26 --out report.md`
-- **オプション**:
-    - `--target` : **[必須]** ターゲット ID
-    - `--mission` : ミッション選択 [`tess`, `kepler`] (デフォルト: "tess")
-    - `--true-p` : 既知の真の周期 (比較用)
-    - `--true-t0` : 既知の真の T0 (比較用)
-    - `--out` : 出力ファイル名 (デフォルト: "report.md")
+### 数値一致性の検証
+`Standard` プリセット（5,000周期）における、検出結果の物理的な一致度です。
 
-### 4️⃣ `batch`：一括解析（ハイスピード・サーチ）
-NASA Exoplanet Archive からターゲットを自動抽出し、連続的に解析を行います。
-- **使用例**: `astrotransit-gpu batch --n-targets 20 --min-depth 1500`
-- **オプション**:
-    - `--n-targets` : 取得・解析するターゲット数 (デフォルト: 10)
-    - `--min-depth` : カタログ上の最低トランジット深度 [ppm] (デフォルト: 500.0)
-    - `--out` : バッチレポートの保存先 (デフォルト: "batch_report.md")
+| 項目 | CPU (Astropy) | GPU (Ours) | 物理差分 | 一致率 |
+| :--- | :--- | :--- | :--- | :--- |
+| **Best Period** | 6.269254 d | 6.265353 d | 0.0039 d | **99.94%** |
+| **Best T0** | 1325.4994 | 3.4772 * | 0.3788 d | 位相一致 |
 
-### 5️⃣ `inject-run`：科学的妥当性の検証
-光度曲線に人工的なトランジット信号を注入し、何パーセント回収できるかをテストします。
-- **使用例**: `astrotransit-gpu inject-run --target "TIC 261136679" --periods "2,5,10" --n-trials 10`
-- **オプション**:
-    - `--target` : **[必須]** ベースとなる光度曲線の ID
-    - `--periods` : 注入する周期（カンマ区切り） (デフォルト: "2.0,5.0,10.0")
-    - `--depths` : 注入する深度（カンマ区切り） (デフォルト: "0.001,0.003,0.01")
-    - `--n-trials` : 各セルごとの試行回数 (デフォルト: 3)
-    - `--out` : 解析レポートの保存先 (デフォルト: "injection_recovery_report.md")
-
-### 6️⃣ `run-config`：構成ファイルによる実行
-YAML 形式の設定ファイルを使用して、複雑な探索条件を一括実行します。
-- **使用例**: `astrotransit-gpu run-config configs/search_param.yaml`
-- **引数**:
-    - `config` : **[必須]** YAML 設定ファイルへのパス
+*\* GPU側は T0 を位相空間上で計算しているため、周期 $(P)$ で剰余をとった値で比較。*
 
 ---
 
-## 3. ヒント ＆ トラブルシューティング
+## 2. ベンチマーク測定環境
 
-- **GPU メモリ不足**: `extreme` プリセット等で 1000万周期を超えるような探索を行う場合、GPU メモリ（VRAM）の消費量が増大します。エラーが出る場合は `--n-periods` を下げて調整してください。
-- **高速化のコツ**: バッチ探索（`batch`）を使用する際は、ネットワーク速度（Lightkurve のダウンロード速度）がボトルネックになることがあります。安定した回線環境での実行を推奨します。
+本報告の数値は、以下の環境において再現可能です。
+
+- **AstroTransit-GPU**: v0.1.0 (Commit: current)
+- **OS**: Windows 11 / Linux (CUDA enabled)
+- **GPU**: NVIDIA Compute Capability 12.0 (Blackwell Architecture)
+- **CPU**: x86_64 Processor
+- **Python**: 3.12.0
+- **CuPy**: v13.6.0
+- **Target**: TIC 261136679 (18,257 data points)
+- **Grid Specs**: Period 0.5–20.0 days, 5 Durations, 200 Phase bins
+- **Timing**: GPU ウォームアップ後、`cuda.Stream.synchronize()` を含む同期計測を実施。
+
+### 再現コマンド
+```bash
+# 標準解像度
+astrotransit-gpu compare --preset standard
+
+# 高解像度（大規模）
+astrotransit-gpu compare --preset large
+
+# ストレステスト
+astrotransit-gpu compare --preset extreme
+```
 
 ---
-*Scaling Exoplanet Discovery with AstroTransit-GPU*
+
+## 3. CLI 完全リファレンス
+
+すべてのコマンドとオプションの詳細は以下の通りです。
+
+### `check`：環境診断
+GPU が利用可能か、またハードウェアの計算能力を確認します。
+
+### `compare`：性能・精度比較
+CPU と GPU の結果を直接比較し、Markdown レポートを生成します。
+- `--target` : 解析対象 (デフォルト: "TIC 261136679")
+- `--preset` : 設定 [`standard`, `large`, `extreme`]
+- `--out` : レポート出力先
+
+### `known`：既知の惑星の再検出
+既存の惑星データを用いて、検出アルゴリズムの妥当性を確認します。
+- `--target` : **[必須]** ターゲット ID
+- `--true-p` : 比較用の真の周期
+
+### `batch` : 一括解析
+複数のターゲットを NASA アーカイブから取得し、並列探索を行います。
+
+### `inject-run` : 回収率テスト
+信号注入（Injection）と回収（Recovery）を行い、検出限界を統計的に評価します。
+
+### `run-config` : 設定ファイル実行
+YAML 形式の設定ファイルを用いて、再現性の高い解析フローを実行します。
+
+---
+*AstroTransit-GPU: Scaling Exoplanet Discovery with Reliability.*

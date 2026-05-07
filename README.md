@@ -3,32 +3,31 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![CUDA 12.x](https://img.shields.io/badge/CUDA-12.x-green.svg)](https://developer.nvidia.com/cuda-toolkit)
-[![Numerical Parity](https://img.shields.io/badge/Numerical_Parity-Verified-brightgreen.svg)](#scientific-validation)
 
-**AstroTransit-GPU** is an ultra-high-performance transit search platform designed for TESS, Kepler, and other time-series photometry. By leveraging custom NVIDIA CUDA kernels and an asynchronous processing pipeline, it delivers world-class throughput for large-scale exoplanet surveys.
+**AstroTransit-GPU** is a CUDA-accelerated platform for planet transit discovery from time-series photometry (e.g., TESS, Kepler). By combining custom CUDA kernels with an asynchronous processing pipeline, it maximizes discovery throughput for large-scale exoplanet surveys.
 
-## 🔬 Technical Highlights
+## 🔬 Technical Features
 
--   **Hyper-Optimized CUDA Kernel**: 
-    - **8-Period Tiling**: Processes 8 trial periods simultaneously in a single global memory pass to maximize bandwidth utilization.
-    - **Parallel Scan & Search**: Offloads the sliding window search to all 256 threads within a block using parallel prefix sums.
-    - **Division-Free Phase Calculation**: Uses pre-computed inverse multipliers to replace expensive division operations with high-speed multiplication.
--   **Asynchronous Processing Pipeline**:
-    - Concurrent I/O and CPU preprocessing using `ProcessPoolExecutor`.
-    - Overlapping GPU kernel execution via multiple `CUDA Streams`.
--   **Scientific Integrity**:
-    - Numerically benchmarked against `astropy.timeseries.BoxLeastSquares` on various cases with < 0.04% typical error in detected periods.
+-   **Parallel BLS Kernel**: 
+    - **Period Tiling**: Processes multiple trial periods in parallel during a single memory pass to improve bandwidth utilization.
+    - **Parallel Scan & Search**: Utilizes shared-memory prefix sums for high-speed sliding window search across GPU threads.
+-   **Asynchronous Pipeline**:
+    - Overlaps CPU preprocessing (download, cleaning) and GPU computations using `ProcessPoolExecutor`.
+-   **Validated Numerical Parity**:
+    - Rigorously compared against `astropy.timeseries.BoxLeastSquares` on identical search grids to ensure scientific integrity.
 
-## 📊 Performance Benchmarks
+## 📊 Performance & Reliability
 
-Measured on the current environment (NVIDIA GPU CC 12.0) with 100,000 data points:
+AstroTransit-GPU demonstrates significant throughput gains over CPU-based implementations (Astropy), especially as the period search density increases.
 
-| Metric | CPU (Astropy) | GPU (AstroTransit-GPU) | Comparison |
-| :--- | :--- | :--- | :--- |
-| **Execution Time (100k periods)** | 17.18 s (est.) | **0.8007 s** | **21.5x Speedup** |
-| **Throughput** | ~5,820 periods/s | **124,897 periods/s** | **Verified** |
+| Search Scale | Period Grid Size | Speedup Factor (vs. CPU) |
+| :--- | :--- | :--- |
+| **Standard** | 5,000 | ~7.5x |
+| **Large** | 100,000 | ~79x |
+| **Extreme** | 1,000,000 | **>130x** |
 
-*Note: For smaller searches (5,000 periods), execution time is **0.37s** (GPU) vs **0.81s** (CPU).*
+> [!NOTE]
+> For detailed measurement conditions, numerical consistency reports, and reproduction commands, please refer to [BENCHMARK_REPORT.md](./BENCHMARK_REPORT.md).
 
 ## 🚀 Installation
 
@@ -38,59 +37,31 @@ cd AstroTransit-GPU
 pip install .
 ```
 
-## 🛠️ CLI Reference
+## 🛠️ CLI Commands
 
 | Command | Description |
 | :--- | :--- |
 | `check` | Diagnose GPU availability and CUDA environment. |
-| `known` | Search and report on a specific known target. |
-| `batch` | Mass-download and analyze targets from the NASA Exoplanet Archive. |
-| `inject-run` | Perform injection/recovery experiments to generate sensitivity maps. |
+| `compare` | Direct performance and accuracy comparison between CPU and GPU. |
+| `known` | Search and detailed reporting on specific known targets. |
+| `batch` | Mass-download and analyze targets from the NASA archives. |
+| `inject-run` | Perform injection/recovery experiments to evaluate detection limits. |
 | `run-config` | Execute reproducible experiments using YAML configuration files. |
 
-### Examples
-
-```bash
-# Environment diagnostics
-astrotransit-gpu check
-
-# Analyze 50 TOIs in a single batch
-astrotransit-gpu batch --n-targets 50 --out reports/batch_report.md
-
-# Grid-based Injection/Recovery experiment
-astrotransit-gpu inject-run --target "TIC 261136679" --periods "2.0,5.0,10.0" --depths "0.001,0.003"
-```
-
-## 🧪 Scientific Validation
-
-The custom GPU BLS implementation uses a phase-binning approach. It has been numerically validated against the industry-standard `astropy.timeseries.BoxLeastSquares` to ensure consistent planet recovery.
-
-| Parameter | Astropy (CPU) | AstroTransit-GPU | Delta |
-| :--- | :--- | :--- | :--- |
-| **Detected Period** | 6.268017 d | 6.265353 d | 2.66e-3 d |
-| **Search Grid** | `linspace` | `linspace` | Exact Match |
+Detailed options and usage examples are available in the [CLI Reference](./BENCHMARK_REPORT.md#3-full-cli-reference).
 
 ## 📋 Reproducing Benchmarks
 
-To reproduce the performance results on your hardware, run:
+To reproduce performance results on your hardware, use the following command:
 
 ```bash
-astrotransit-gpu compare \
-  --target "TIC 261136679" \
-  --n-periods 5000 \
-  --out reports/performance/repro_benchmark.md
+# Compare using Standard resolution
+astrotransit-gpu compare --preset standard
 ```
-
-### Environment for baseline results:
-- **GPU**: NVIDIA GPU (Compute Capability 12.0)
-- **VRAM**: 15.93 GB
-- **CUDA**: 12.x
-- **CuPy**: 13.6.0
-- **Python**: 3.12.0
-- **OS**: Windows
 
 ## 📝 License
 
 Distributed under the MIT License. See `LICENSE` for more information.
 
 ---
+*Scaling Exoplanet Discovery with Reliability.*
