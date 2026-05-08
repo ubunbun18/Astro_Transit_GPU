@@ -2,6 +2,9 @@ import numpy as np
 import os
 import cupy as cp
 import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Kernel cache
 _vbls_kernel_cache = {}
@@ -26,8 +29,8 @@ def get_vbls_kernels(dtype, n_data, n_bins, n_durations, use_blackwell=None):
         return _vbls_kernel_cache[cache_key]
     
     if is_blackwell:
-        kernel_file = "vbls_blackwell.cu"
-        kernel_name = "vbls_blackwell_atomic_kernel"
+        kernel_file = "vbls_blackwell_v39.cu"
+        kernel_name = "vbls_v39_weighted_kernel"
     else:
         kernel_file = "vbls.cu"
         kernel_name = "vbls_ultra_kernel"
@@ -134,13 +137,14 @@ def run_vbls_massive(time_array, flux_matrix, periods, durations, weights_matrix
             grid = (int((curr_periods + 15) // 16), int(curr_targets))
 
             if kernels["is_blackwell"]:
-                # V37 Dynamic SMEM Calculation
-                smem_size = (2 * n_data * dtype.itemsize) + (2 * 16 * (n_bins + 1) * dtype.itemsize)
+                # V39 Dynamic SMEM Calculation (3 * N_DATA for flux, dt, weight)
+                smem_size = (3 * n_data * dtype.itemsize) + (2 * 16 * (n_bins + 1) * dtype.itemsize)
                 kernels["vbls_ultra"].max_dynamic_shared_size_bytes = smem_size
                 
                 kernels["vbls_ultra"](
                     grid, (512,),
                     (batch_flux, dt_array_gpu, period_pairs,
+                     weights_matrix_gpu[t_idx:t_end],
                      res_pwr, res_t0, res_dur, res_dep, res_p,
                      curr_periods, t_start),
                     shared_mem=smem_size

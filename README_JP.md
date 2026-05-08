@@ -1,17 +1,17 @@
-# AstroTransit-GPU (v1.1.0)
+# AstroTransit-GPU (v1.3.0)
 
 [![CI](https://github.com/ubunbun18/Astro_Transit_GPU/actions/workflows/ci.yml/badge.svg)](https://github.com/ubunbun18/Astro_Transit_GPU/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](./CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
 **AstroTransit-GPU** は、TESS/Kepler 光度曲線に対するトランジット探索（Box Least Squares）を CUDA で高速化し、Astropy との数値的一致を保証しつつ、再現可能なベンチマークと注入実験（Injection/Recovery）を可能にする研究者向けの GPU 探索基盤です。
 
 ## 🌟 特徴
 
-- **高速かつ正確**: CUDA による並列化で Astropy 比 100 倍以上のスループットを達成しつつ、スペクトル全体の極めて高い相関（[Correlation > 0.95](./BENCHMARK_REPORT_JP.md#数値一致性の検証)）を維持。
-- **Blackwell Singularity (V37)**: NVIDIA Blackwell (および Ada) アーキテクチャに特化した極限最適化。**219 億個の (天体, 周期) ペアを約 13 分で走査可能** (約 2,800 万ペア/秒)。
-- **Survey Scale パイプライン**: Sector 単位の **Consolidated Sector Cache** 構築により、ディスク I/O 待ちを完全に解消。
-- **超高速スクリーニング**: 1.6 万天体のセクター全体に対し、**10 万周期探索を 1 分未満** (Blackwell V37) で完遂（従来モデルでは約 30 分）。
+- **超高速かつ正確**: Astropy比で100倍以上のスループットを達成しつつ、高い科学的妥当性を維持。
+- **Apex Predator (V39)**: Blackwellアーキテクチャに最適化された最新の堅牢カーネル。**219億組の探索を約9.4分**で完了（~3,900万組/秒）し、重み付きSNRに対応。
+- **科学的バリデーション済み**: NASA TOIカタログとの照合により、Sector 1 FFIデータで **38.75%の回収率** を実証。
+- **サーベイスケール・パイプライン**: `SectorCache` システムによりI/Oボトルネックを排除し、セクター全件（1.6万天体）を **45秒以内** にスクリーニング。
 - **Astropy 互換 API**: 既存のワークフローに組み込みやすいオブジェクト指向設計。
 - **堅牢な自動運用**: 破損した FITS キャッシュの自動検知・削除・リトライ機能を搭載。
 - **実データ対応**: `flux_err`（重み付き解析）および `float64`（倍精度）をフルサポート。

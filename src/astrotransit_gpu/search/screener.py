@@ -21,17 +21,15 @@ class GpuScreener:
         Process an entire sector from SectorCache data.
         Automatically detects if data can be vectorized.
         """
-        offsets = sector_data['offsets']
-        tic_ids = sector_data['tic_ids']
-        n_targets = len(tic_ids)
+        if sector_data.get('is_vectorized', False):
+            return self.screen_sector_vbls(sector_data, output_path, target_batch_size=batch_size, use_blackwell=use_blackwell)
         
-        # Check if all targets have the same length (common for FFI)
-        lengths = np.diff(offsets)
-        if len(np.unique(lengths)) == 1:
-            return self.screen_sector_vbls(sector_data, output_path, batch_size=batch_size, use_blackwell=use_blackwell)
-        else:
-            # Fallback to sequential for ragged data
+        # Fallback to sequential for ragged data
+        offsets = sector_data.get('offsets')
+        if offsets is not None:
             return self._screen_sector_sequential(sector_data, output_path)
+        else:
+            raise KeyError("Sector data must contain either 'is_vectorized=True' or 'offsets' array.")
 
     def screen_sector_vbls(self, sector_data, output_path=None, target_batch_size=10000, period_batch_size=10000, use_blackwell=False):
         """Ultra-fast vectorized screening for uniform-length data (Scales to 1M targets)."""
@@ -44,8 +42,13 @@ class GpuScreener:
         if sector_data.get('is_vectorized', False):
             # V23/V24 Optimized Cache Format
             common_time = sector_data['time']
-            flux_matrix = sector_data['flux']
-            weights_matrix = 1.0 / (sector_data['flux_err']**2)
+            flux_matrix = cp.asarray(sector_data['flux'], dtype=self.dtype)
+            err_matrix = cp.asarray(sector_data['flux_err'], dtype=self.dtype)
+            
+            # V39: Weight calculation with padding handling
+            # Pad value is 1.0, real error is < 0.1
+            weights_matrix = 1.0 / (err_matrix**2)
+            weights_matrix[err_matrix > 0.9] = 0.0
             n_pts = len(common_time)
         else:
             # Legacy/Ragged Format - Manual Reshape
@@ -56,7 +59,10 @@ class GpuScreener:
             n_pts = int(np.diff(offsets)[0])
             common_time = time_all[:n_pts]
             flux_matrix = flux_all.reshape(n_targets, n_pts)
-            weights_matrix = (1.0 / (err_all * err_all)).reshape(n_targets, n_pts)
+            
+            weights_matrix = 1.0 / (err_all**2)
+            weights_matrix[err_all > 0.9] = 0.0
+            weights_matrix = weights_matrix.reshape(n_targets, n_pts)
         
         # Prepare CSV file
         out_f = None
