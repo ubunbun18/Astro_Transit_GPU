@@ -38,11 +38,21 @@ astrotransit-gpu validate --results outputs/bench_219331_v39.csv
 物理的に検出可能な（観測期間中に 2 回以上のトランジットが発生する）既知 TOI のうち、上記判定基準を満たして検出された割合。
 $$Completeness = \frac{Recovered\ TOIs}{Detectable\ TOIs}$$
 
-> [!NOTE]
-> **回収率の数値について**: 
-> - **38.75%**: Sector 1 のターゲットのみを対象とした、最適化された小規模テストの結果。
-> - **17.31%**: 全天 21.9万天体を対象とした、大規模スクリーニング（V39標準設定）の結果。
-> データの品質や前処理の度合いにより、完備性は変動します。
+> [!IMPORTANT]
+> **公式検証値と設定ファイルの使い分け**:
+> 本プロジェクトでは、検証データの規模（入手範囲）に応じて 2 つの公式基準を定義しています。
+>
+> 1. **大規模サブセット基準 (Large-Scale Subset)**:
+>    - **設定**: `configs/validation_v39_large_subset.yaml` (または `validation_v39.yaml`)
+>    - **対象**: 入手済みの 219,331 天体（全天の一部のサブセット）
+>    - **期待値**: **17.31%** (`require_t0: true`)
+>    - **用途**: 入手できた広範囲なデータにおける公式なパイプライン性能。
+>
+> 2. **Sector 1 限定基準 (Sector 1 Focused)**:
+>    - **設定**: `configs/validation_v39_sector1.yaml`
+>    - **対象**: 約 16,000 天体（Sector 1 のみ）
+>    - **期待値**: **38.75%** (`require_t0: false`)
+>    - **用途**: 開発中のクイックな性能回帰テスト。
 
 ### 4.2 偽陽性率 (FPR / Unknown Signal Rate)
 有意な信号（SNR > 7.1）のうち、既知の TOI または 食連星（EB）カタログに該当しない天体の割合。

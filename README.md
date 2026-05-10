@@ -30,12 +30,19 @@ For massive-scale screening (e.g., TESS QLP full survey), we provide the **V39 "
 
 ### Usage (CLI):
 ```bash
-python -m astrotransit_gpu screen-sector --cache sector_1.npz --blackwell
+python -m astrotransit_gpu screen-sector \
+  --cache-dir data/sector1_cache \
+  --out outputs/bench_219331_v39.csv \
+  --n-periods 100000 \
+  --blackwell
 ```
 
 ### Usage (Python API):
 ```python
-screener = GpuScreener(n_bins=128)
+periods = np.linspace(0.5, 20.0, 100000)
+durations = np.linspace(0.01, 0.2, 5)
+
+screener = GpuScreener(periods, durations, n_bins=128)
 results = screener.screen_sector_vbls(data, use_blackwell=True)
 ```
 

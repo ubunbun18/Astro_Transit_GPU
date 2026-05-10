@@ -52,4 +52,5 @@ V39 replaces simple point counts with a **Weighted Sum of Squares** approach:
 where `W` is the weight ($1/\sigma^2$) and `WF` is weighted flux. This allows the kernel to **statistically ignore observation gaps (padding)**, which is critical for recovering planets in FFI data with large gaps (e.g., TESS downlink breaks).
 
 ## 🧪 Scientific Correctness
-The V39 engine is the current production standard. It has been validated against the NASA TOI catalog, achieving a **38.75% recovery rate** on Sector 1 FFI data, compared to 0% for unweighted versions that were susceptible to gap artifacts.
+The V39 engine is the current production standard. It has been validated against the NASA TOI catalog, achieving a **17.31% recovery rate** on a large-scale subset of TESS data (219,331 targets), compared to 0% for unweighted versions that were susceptible to gap artifacts.
+*Note: Recovery rate reaches 38.75% in Sector 1 focused tests. See [VALIDATION.md](./VALIDATION.md) for details.*

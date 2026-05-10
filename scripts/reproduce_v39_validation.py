@@ -67,12 +67,20 @@ def main():
 
     logger.info(f"Reproduction report saved to {args.report}")
     
-    # 期待値との照合 (簡易チェック)
-    expected_rate = 0.3875 # READMEにある38.75%
-    if abs(summary['completeness'] - expected_rate) < 0.05:
-        logger.info("✅ 科学的完備性が期待値(約38.8%)に近い値であることを確認しました。")
+    # 期待値との照合 (YAMLの expected セクションを使用)
+    expected_conf = validator.config.get('expected', {})
+    expected_rate = expected_conf.get('completeness', 0.0)
+    
+    if expected_rate > 0:
+        logger.info(f"Checking against expected rate: {expected_rate:.2%}")
+        if abs(summary['completeness'] - expected_rate) < 0.01: # 許容誤差 1%
+            logger.info(f"✅ 科学的完備性が期待値 ({expected_rate:.2%}) と一致しました。")
+        else:
+            diff = summary['completeness'] - expected_rate
+            logger.warning(f"完備性が期待値から乖離しています (差分: {diff:+.2%})。")
+            logger.warning(f"モード: {expected_conf.get('mode', 'N/A')}")
     else:
-        logger.warning(f"完備性が期待値({expected_rate:.1%})から乖離しています。データまたは設定を確認してください。")
+        logger.info("No expected completeness defined in config. Skipping comparison.")
 
 if __name__ == "__main__":
     main()

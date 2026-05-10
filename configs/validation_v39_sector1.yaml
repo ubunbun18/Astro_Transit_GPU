@@ -1,0 +1,17 @@
+# V39 Scientific Validation: Sector 1 Focused
+# Coverage: ~16,000 targets (Sector 1 only)
+# Reference: README.md / BENCHMARK_REPORT.md
+
+validation:
+  power_threshold: 7.1
+  p_tol: 0.02
+  t0_tol: 0.5
+  require_t0: false  # Sector 1 focused test often uses relaxed phase criteria
+
+expected:
+  completeness: 0.3875
+  mode: "sector1_focused_v39"
+
+catalogs:
+  toi_path: "data/catalogs/toi_latest.csv"
+  eb_path: "data/catalogs/eb_latest.csv"

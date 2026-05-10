@@ -41,18 +41,18 @@ By utilizing the consolidated binary cache to eliminate disk I/O bottlenecks, we
 - **Corrupt Cache Handling**: Automated detection, cleanup, and retry logic ensure a 100% success rate even with unstable network conditions.
 - **Memory Optimization**: Dynamic shared memory tiling ensures stable execution across variable bin sizes and hardware constraints.
 
-## 5. Blackwell Singularity (V37) Extreme Performance
-Performance metrics for the **V37 "Apex Predator"** engine, optimized for next-generation NVIDIA Blackwell and Ada architectures, tested on a massive-scale full survey dataset.
+44: ## 5. Blackwell Singularity (V37) Extreme Performance
+45: Performance metrics for the **V37 "Apex Predator"** engine, optimized for next-generation NVIDIA Blackwell and Ada architectures, tested on a large-scale subset of available survey data.
 
-- **Sample Size**: 219,331 QLP-cached targets (Full dataset)
+47: - **Sample Size**: 219,331 QLP-cached targets (Large-scale subset)
 - **Search Grid**: **100,000 periods** / target
 - **Total Search Pairs**: **21.93 Billion** (Target × Periods)
 - **Hardware**: NVIDIA Blackwell Class GPU (V37 Zero-Div Optimization)
 
 | Metric | Value | Notes |
 | :--- | :--- | :--- |
-| Total Targets Processed | 219,331 | Full survey sample |
-| Total Runtime | **784.6 s** (13m 4s) | Full scan using V37 kernel |
+| Total Targets Processed | 219,331 | Available subset |
+| Total Runtime | **784.6 s** (13m 4s) | Subset scan using V37 kernel |
 | **Average Throughput** | **279.5 targets / s** | (16,770 targets / min) |
 | **Effective Compute Rate** | **~57 Giga-Checks / s** | (Transit trials per second) |
 | **Speedup vs. Legacy (5060 Ti)** | **~30×** | Throughput-based comparison |
@@ -65,14 +65,15 @@ The introduction of **Zero-Div Logic** (cross-multiplication) and **Zero-Spill S
 - **RTX 5060 Ti (Legacy)**: **1,728 seconds** (28m 48s)
 - **Improvement**: ~30x reduction in analysis time.
 
-Screening an entire TESS Sector (16,000 targets) now takes **less than 60 seconds**, compared to 30 minutes in previous versions. This architectural leap enables near-instantaneous screening of the entire TESS QLP survey and sets a new standard for exoplanet discovery throughput.
+68: Screening an entire TESS Sector (16,000 targets) now takes **less than 60 seconds**, compared to 30 minutes in previous versions. This architectural leap enables near-instantaneous screening of large portions of the TESS QLP data and sets a new standard for exoplanet discovery throughput.
 
 ## 6. Weight-aware Robustness (V39) Scientific Validation
 Maintains the extreme performance of V37 while introducing statistical weight handling to eliminate artifacts from gaps and padding. This is the current production-grade kernel.
 
-- **Dataset**: TESS QLP Full Sample (219,331 targets)
-- **Search Grid**: **100,000 periods** / target
-- **Scientific Achievement**: **38.75% TOI Recovery Rate** in Sector 1 FFI data.
+73: - **Dataset**: TESS QLP Large-Scale Subset (219,331 targets)
+74: - **Search Grid**: **100,000 periods** / target
+75: - **Scientific Achievement**: **17.31% TOI Recovery Rate** (Large-scale subset, official criteria)
+76:   *Note: 38.75% recovery achieved in specific Sector 1 focused tests. See [VALIDATION.md](./docs/VALIDATION.md) for details.*
 
 | Metric | Value | Notes |
 | :--- | :--- | :--- |
