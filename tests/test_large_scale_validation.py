@@ -37,7 +37,7 @@ def test_validation_normal_case(sample_results, sample_toi):
     
     assert summary['toi_in_sample'] == 2  # 1001, 1002
     assert summary['recovered_toi'] == 2
-    assert summary['recovery_rate'] == 1.0
+    assert summary['completeness'] == 1.0
     
     # 1001 は direct match
     assert matches[matches['tic_id'] == '1001']['match_type'].iloc[0] == 'direct'
@@ -67,7 +67,7 @@ def test_invariant_recovery_rate_range(sample_results, sample_toi):
     """不変条件検証: 回収率が 0.0 ~ 1.0 の範囲に収まるか"""
     validator = LargeScaleValidator()
     summary, _, _, _, _ = validator.validate_results(sample_results, sample_toi)
-    assert 0.0 <= summary['recovery_rate'] <= 1.0
+    assert 0.0 <= summary['completeness'] <= 1.0
 
 def test_empty_results():
     """異常系: 結果が空の場合"""

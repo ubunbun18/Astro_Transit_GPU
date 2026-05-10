@@ -248,10 +248,12 @@ class LargeScaleValidator:
         return stats
 
     def _empty_results(self):
-        return {
-            'total_targets': 0, 'toi_in_sample': 0, 'recovered_toi': 0, 
-            'recovery_rate': 0, 'new_candidates_count': 0
-        }, pd.DataFrame(), pd.DataFrame()
+        summary = {
+            'total_targets': 0, 'toi_in_sample': 0, 'detectable_toi': 0, 
+            'recovered_toi': 0, 'completeness': 0.0, 'new_candidates_count': 0,
+            'significant_sigs': 0, 'fpr': 0.0, 'eb_found': 0
+        }
+        return summary, pd.DataFrame(), pd.DataFrame(), {}, {}
 
 def main():
     # パスの設定
