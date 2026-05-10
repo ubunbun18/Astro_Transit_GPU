@@ -98,9 +98,9 @@ def run_vbls_massive(time_array, flux_matrix, periods, durations, weights_matrix
     global_best_depth = cp.zeros(n_targets_total, dtype=dtype)
     global_best_period = cp.zeros(n_targets_total, dtype=dtype)
 
-    # V27: Hyper-batching for Blackwell
-    target_batch_size = 8000
-    period_batch_size = 25000
+    # V27: Hyper-batching for Blackwell (Defaults if not specified)
+    if target_batch_size is None: target_batch_size = 8000
+    if period_batch_size is None: period_batch_size = 25000
     
     from tqdm import tqdm
     
@@ -114,6 +114,10 @@ def run_vbls_massive(time_array, flux_matrix, periods, durations, weights_matrix
     dur_gpu = cp.asarray(durations, dtype=dtype)
     cp.cuda.runtime.memcpy(dur_ptr.ptr, dur_gpu.data.ptr, n_durations * dtype.itemsize, 3)
 
+    # Ensure weights are present (V39 requires them)
+    if weights_matrix_gpu is None:
+        weights_matrix_gpu = cp.ones((n_targets_total, n_data), dtype=dtype)
+    
     for p_idx in range(0, n_periods_total, period_batch_size):
         p_end = min(p_idx + period_batch_size, n_periods_total)
         curr_periods = p_end - p_idx
@@ -127,6 +131,7 @@ def run_vbls_massive(time_array, flux_matrix, periods, durations, weights_matrix
             t_end = min(t_idx + target_batch_size, n_targets_total)
             curr_targets = t_end - t_idx
             batch_flux = flux_matrix_gpu[t_idx:t_end]
+            batch_weights = weights_matrix_gpu[t_idx:t_end]
             
             res_pwr = global_max_power[t_idx:t_end]
             res_t0 = global_best_t0[t_idx:t_end]
@@ -144,7 +149,7 @@ def run_vbls_massive(time_array, flux_matrix, periods, durations, weights_matrix
                 kernels["vbls_ultra"](
                     grid, (512,),
                     (batch_flux, dt_array_gpu, period_pairs,
-                     weights_matrix_gpu[t_idx:t_end],
+                     batch_weights,
                      res_pwr, res_t0, res_dur, res_dep, res_p,
                      curr_periods, t_start),
                     shared_mem=smem_size

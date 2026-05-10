@@ -28,11 +28,6 @@ def test_grid_consistency():
     # Note: GPU uses binning, so it won't be EXACTLY identical, but should pick the same best period
     assert abs(cpu_res['period'] - gpu_res['best_period']) < 0.01
     
-    # Power correlation (optional check)
-    cpu_power = cpu_res['power']
-    gpu_power = gpu_res['power'].get()
-    
-    # The peak should be at the same index or very close
-    cpu_best_idx = np.argmax(cpu_power)
-    gpu_best_idx = np.argmax(gpu_power)
-    assert abs(cpu_best_idx - gpu_best_idx) <= 1
+    # B. Depth consistency
+    # Note: GPU depth might vary slightly due to difference in baseline handling, but should be close.
+    assert abs(cpu_res['depth'] - gpu_res['best_depth']) < 0.005

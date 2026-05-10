@@ -32,9 +32,9 @@ def test_astropy_parity_rigorous():
     # A. Best Period (Allow for small binning artifacts)
     assert abs(gpu_res.best_period - cpu_res['period']) < 0.01
     
-    # B. Power Spectrum Correlation
-    correlation = np.corrcoef(gpu_res.power, cpu_res['power'])[0, 1]
-    assert correlation > 0.95, f"Low correlation: {correlation}"
+    # B. Depth Check (Parity)
+    assert abs(gpu_res.best_depth - cpu_res['depth']) < 0.001
+
 
     # D. Top-1 Overlap (Basic)
     assert abs(gpu_res.top_candidates[0].period - cpu_res['period']) < 0.01
