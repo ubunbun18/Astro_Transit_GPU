@@ -25,6 +25,8 @@ def sample_toi():
         'tid': ['1001', '1002', '1005'],
         'pl_orbper': [10.01, 10.0, 15.0], # 1001: direct, 1002: harmonic
         'pl_tranmid': [100.0, 105.0, 110.0],
+        'st_tmag': [10.0, 12.0, 15.0],
+        'st_teff': [5800, 4500, 3500], # G, K, M type
         'toi': ['TOI 1.01', 'TOI 2.01', 'TOI 5.01']
     })
 
@@ -78,7 +80,7 @@ def test_empty_results():
 def test_contract_violation_negative_period():
     """契約違反テスト: 周期が負数の場合（match_candidate側で処理）"""
     res = pd.DataFrame({'tic_id': ['999'], 'period': [-1.0], 't0': [0], 'power': [20]})
-    toi = pd.DataFrame({'tid': ['999'], 'pl_orbper': [10.0], 'pl_tranmid': [0]})
+    toi = pd.DataFrame({'tid': ['999'], 'pl_orbper': [10.0], 'pl_tranmid': [0], 'st_tmag': [12.0], 'st_teff': [5000]})
     
     validator = LargeScaleValidator()
     _, matches, _ = validator.validate_results(res, toi)

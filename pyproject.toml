@@ -38,6 +38,8 @@ benchmark = [
 astrotransit-gpu = "astrotransit_gpu.cli:main"
 
 [tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 markers = [
     "gpu: tests that require a CUDA-enabled GPU and CuPy",
     "slow: tests that take a long time to run"
