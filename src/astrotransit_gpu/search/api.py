@@ -68,16 +68,22 @@ class BoxLeastSquaresGPU:
         # Extract Top-K candidates
         top_k_raw = get_top_k_candidates(raw_res, k=5)
         top_candidates = [
-            Candidate(c['period'], c['t0'], c['duration'], c['depth'], c['power'])
+            Candidate(
+                float(c['period']), 
+                float(c['t0']), 
+                float(c['duration']), 
+                float(c['depth']), 
+                float(c['power'])
+            )
             for c in top_k_raw
         ]
         
         return BLSResult(
-            best_period=raw_res['best_period'],
-            best_t0=raw_res['best_t0'],
-            best_duration=raw_res['best_duration'],
-            best_depth=raw_res['best_depth'],
-            best_power=raw_res['snr'],
+            best_period=float(raw_res['best_period']),
+            best_t0=float(raw_res['best_t0']),
+            best_duration=float(raw_res['best_duration']),
+            best_depth=float(raw_res['best_depth']),
+            best_power=float(raw_res['snr']),
             periods=periods,
             power=raw_res['power'].get() if hasattr(raw_res['power'], 'get') else raw_res['power'],
             top_candidates=top_candidates,

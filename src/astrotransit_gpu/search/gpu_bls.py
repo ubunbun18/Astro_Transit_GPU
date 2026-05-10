@@ -118,10 +118,11 @@ def run_gpu_bls(time, flux, periods, durations, flux_err=None, n_bins=200, dtype
     blocks_per_grid = (n_periods + n_tile - 1) // n_tile
 
     # Launch kernel
+    t_start = float(time_gpu[0]) if n_data > 0 else 0.0
     kernel(
         (blocks_per_grid,), (threads_per_block,),
         (time_gpu, flux_gpu, weights_gpu, n_data, inv_periods_gpu, n_periods,
-         durations_gpu, n_durations, n_bins, dtype.type(time_gpu[0].item()),
+         durations_gpu, n_durations, n_bins, dtype.type(t_start),
          power_gpu, best_t0_gpu, best_dur_gpu, best_depth_gpu),
         shared_mem=shared_mem_size
     )
@@ -145,7 +146,13 @@ def run_gpu_bls(time, flux, periods, durations, flux_err=None, n_bins=200, dtype
 def get_top_k_candidates(results, k=5, min_dist_bins=10):
     from scipy.signal import find_peaks
     
+    # Move all potential GPU arrays to CPU once
     power = results['power'].get() if hasattr(results['power'], 'get') else results['power']
+    all_t0s = results['all_t0s'].get() if hasattr(results['all_t0s'], 'get') else results['all_t0s']
+    all_durs = results['all_durs'].get() if hasattr(results['all_durs'], 'get') else results['all_durs']
+    all_depths = results['all_depths'].get() if hasattr(results['all_depths'], 'get') else results['all_depths']
+    periods = results['periods'] # Already on CPU
+    
     peaks, _ = find_peaks(power, distance=min_dist_bins)
     
     if len(peaks) == 0:
@@ -158,10 +165,10 @@ def get_top_k_candidates(results, k=5, min_dist_bins=10):
     candidates = []
     for idx in top_peaks:
         candidates.append({
-            'period': float(results['periods'][idx]),
-            't0': float(results['all_t0s'][idx].item()),
-            'duration': float(results['all_durs'][idx].item()),
-            'depth': float(results['all_depths'][idx].item()),
+            'period': float(periods[idx]),
+            't0': float(all_t0s[idx]),
+            'duration': float(all_durs[idx]),
+            'depth': float(all_depths[idx]),
             'power': float(power[idx])
         })
     return candidates

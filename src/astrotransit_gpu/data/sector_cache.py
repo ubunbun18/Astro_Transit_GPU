@@ -167,3 +167,43 @@ class SectorCache:
         if not res['is_vectorized']:
             res['offsets'] = data['offsets']
         return res
+
+    def get_target_data(self, tic_id, loaded_data=None):
+        """
+        Retrieves time, flux, and flux_err for a single TIC ID from the cache.
+        Supports both vectorized (matrix) and flat (concatenated) formats.
+        """
+        if loaded_data is None:
+            loaded_data = self.load()
+            
+        tic_ids = loaded_data['tic_ids']
+        idx_arr = np.where(tic_ids == int(tic_id))[0]
+        
+        if len(idx_arr) == 0:
+            return None
+            
+        idx = idx_arr[0]
+        
+        if loaded_data.get('is_vectorized', False):
+            # Vectorized format (N_stars, N_times)
+            time = loaded_data['time']
+            flux = loaded_data['flux'][idx]
+            flux_err = loaded_data['flux_err'][idx]
+            # Standard mask for vectorized padding
+            mask = flux_err < 0.99
+            return {
+                "time": time[mask],
+                "flux": flux[mask],
+                "flux_err": flux_err[mask]
+            }
+        else:
+            # Flat format (concatenated stars)
+            offsets = loaded_data['offsets']
+            start = offsets[idx]
+            end = offsets[idx+1] if idx+1 < len(offsets) else len(loaded_data['flux'])
+            
+            return {
+                "time": loaded_data['time'][start:end],
+                "flux": loaded_data['flux'][start:end],
+                "flux_err": loaded_data['flux_err'][start:end]
+            }

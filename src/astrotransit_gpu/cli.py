@@ -154,6 +154,23 @@ def main():
     parser_validate.add_argument("--config", type=str, default="configs/validation_v39.yaml", help="Path to validation config")
     parser_validate.add_argument("--report", type=str, default="reports/OFFICIAL_VALIDATION_REPORT.md", help="Output report path")
 
+    # 8. vet
+    parser_vet = subparsers.add_parser("vet", help="Candidate Vetting Pipeline: Rank and evaluate candidates")
+    parser_vet.add_argument("--results", type=str, required=True, help="Path to screening results CSV")
+    parser_vet.add_argument("--cache-dir", type=str, help="Directory containing built sector cache (for plotting)")
+    parser_vet.add_argument("--config", type=str, default="configs/vetting_v1.yaml", help="Path to vetting config")
+    parser_vet.add_argument("--out", type=str, default="reports/vetting", help="Output directory for reports and plots")
+
+    # 9. refine
+    parser_refine = subparsers.add_parser("refine", help="Refine screening results: Detailed Top-K search on top targets")
+    parser_refine.add_argument("--results", type=str, required=True, help="Path to initial screening results CSV")
+    parser_refine.add_argument("--cache-dir", type=str, required=True, help="Directory containing built sector cache")
+    parser_refine.add_argument("--config", type=str, default="configs/vetting_v1.yaml", help="Path to vetting config (for refinement rules)")
+    parser_refine.add_argument("--out", type=str, default="screening_results_refined.csv", help="Output CSV path")
+    parser_refine.add_argument("--top-k", type=int, default=5, help="Number of candidates per star")
+    parser_refine.add_argument("--n-periods", type=int, default=10000, help="Number of periods for refined search")
+    parser_refine.add_argument("--snr-threshold", type=float, help="Override SNR threshold from config")
+
     args = parser.parse_args()
 
     if args.command == "check":
@@ -413,7 +430,7 @@ def main():
         backend_name = "CPU" if args.cpu else "GPU"
         print(f"Batch Analysis ({backend_name}): {len(remaining_ids)} remaining, {args.workers} threads, {args.n_periods} periods.")
         
-        fieldnames = ["tic_id", "status", "period", "t0", "depth", "power", "n_data", 
+        fieldnames = ["tic_id", "status", "period", "t0", "depth", "duration", "power", "n_data", 
                       "download_time", "preprocess_time", "gpu_time", "total_time", "error"]
 
         # Open file in append mode
@@ -459,12 +476,13 @@ def main():
                                 
                                 res_row.update({
                                     "period": best_period, "t0": best_t0,
-                                    "depth": best_depth, "power": best_power,
+                                    "depth": best_depth, "duration": float(res_obj.best_duration if not args.cpu else res_dict['duration']),
+                                    "power": best_power,
                                     "gpu_time": gpu_time,
                                     "total_time": item['download_time'] + item['preprocess_time'] + gpu_time
                                 })
                             except Exception as e:
-                                res_row.update({"status": "failed", "error": f"GPU Error: {str(e)}", "gpu_time": 0})
+                                res_row.update({"status": "failed", "error": f"Error: {str(e)}", "gpu_time": 0})
                         
                         writer.writerow(res_row)
                         csvfile.flush()
@@ -511,6 +529,40 @@ def main():
             f.write(pd.Series(summary).to_markdown())
             f.write("\n")
         print(f"\nReport saved to: {args.report}")
+
+    elif args.command == "vet":
+        from .vet.pipeline import run_vetting_pipeline
+        run_vetting_pipeline(
+            results_csv=args.results,
+            cache_dir=args.cache_dir,
+            config_path=args.config,
+            out_dir=args.out
+        )
+
+    elif args.command == "refine":
+        from .search.refiner import CandidateRefiner
+        import yaml
+        
+        # Load config for refinement rules
+        cfg = {}
+        if args.config and os.path.exists(args.config):
+            with open(args.config, 'r') as f:
+                full_cfg = yaml.safe_load(f)
+                cfg = full_cfg.get('refinement', {})
+        
+        # CLI override
+        if args.snr_threshold is not None:
+            cfg['snr_threshold'] = args.snr_threshold
+
+        refiner = CandidateRefiner(cache_dir=args.cache_dir, n_periods=args.n_periods)
+        refiner.refine_from_csv(
+            input_csv=args.results,
+            output_csv=args.out,
+            config=cfg,
+            toi_path=full_cfg.get('toi_catalog') if 'full_cfg' in locals() else None,
+            eb_path=full_cfg.get('eb_catalog') if 'full_cfg' in locals() else None,
+            top_k=args.top_k
+        )
 
     else:
         parser.print_help()

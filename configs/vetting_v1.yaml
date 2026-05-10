@@ -1,0 +1,37 @@
+# Refinement selection rules
+refinement:
+  snr_threshold: 50000000000.0  # 5e10
+  top_n_targets: 50
+  random_sample_n: 10
+  
+  # Heuristics for "planet-like" low SNR
+  planet_like:
+    min_power: 10000000000.0    # 1e10
+    max_depth: 0.01      # 1%
+    max_duration_frac: 0.1 # duration < 10% of period
+    
+  # Heuristics for "artifact/EB-like" (to search for secondary signals)
+  artifact_like:
+    min_depth: 0.1       # Very deep
+    min_duration_frac: 0.3
+
+# Path to catalogs (Optional)
+toi_catalog: data/catalogs/toi_latest.csv
+eb_catalog: data/tess_eb_catalog.csv
+
+top_n_plots: 100
+
+# Scoring and ranking
+scoring:
+  snr_weight: 1.0
+  snr_norm: 1000000000.0 # Adjusted for current GPU power scale
+  plausibility_weight: 1.0
+  known_toi_bonus: 0.5
+  known_eb_penalty: -0.8
+
+harmonic_tolerance: 0.01
+top_n_plots: 50
+
+# Path to catalogs (Optional)
+# toi_catalog: data/catalogs/toi_list.csv
+# eb_catalog: data/catalogs/eb_list.csv
