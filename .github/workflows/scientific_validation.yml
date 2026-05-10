@@ -1,0 +1,50 @@
+name: Scientific Validation
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch: # 手動実行を許可
+
+jobs:
+  validate-science:
+    name: Verify Scientific Integrity (V39 Baseline)
+    runs-on: ubuntu-latest # または GPU 搭載の self-hosted runner
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+          pip install pandas numpy pyyaml tqdm
+
+      - name: Check for Validation Data
+        id: check_data
+        run: |
+          if [ -f "outputs/bench_219331_v39.csv" ]; then
+            echo "data_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "data_exists=false" >> $GITHUB_OUTPUT
+            echo "::warning::Validation data (outputs/bench_219331_v39.csv) not found. Skipping full validation."
+          fi
+
+      - name: Run Scientific Validation
+        if: steps.check_data.outputs.data_exists == 'true'
+        run: |
+          python scripts/reproduce_v39_validation.py --results outputs/bench_219331_v39.csv --config configs/validation_v39.yaml
+
+      - name: Upload Validation Report
+        if: always() && steps.check_data.outputs.data_exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: scientific-validation-report
+          path: reports/REPRODUCTION_REPORT_V39.md

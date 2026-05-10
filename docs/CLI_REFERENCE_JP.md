@@ -1,4 +1,4 @@
-# AstroTransit-GPU CLI 完全リファレンス (v1.0.0)
+# AstroTransit-GPU CLI 完全リファレンス (v1.3.0)
 
 AstroTransit-GPU のコマンドラインインターフェースは、研究者が再現可能な解析を迅速に行えるよう設計されています。
 
@@ -131,6 +131,20 @@ astrotransit-gpu benchmark --config config.yaml [--outdir reports] [--gpu-only]
   ```bash
   # 1.6万天体に対して10万周期の超精密探索を30分で実行
   astrotransit-gpu screen-sector --cache-dir data/sector1_cache --n-periods 100000
+  ```
+
+---
+
+### 9. `validate` — 公式科学検証パイプライン
+探索結果の CSV を入力とし、既知惑星（TOI）カタログや食連星（EB）カタログと照合して、完備性（Completeness）や偽陽性率（FPR）を算出します。
+
+- **引数**:
+  - `--results` (必須): `screen-sector` 等で生成された結果 CSV のパス。
+  - `--config` (Default: `configs/validation_v39.yaml`): 検証条件を固定する設定ファイル。
+  - `--report` (Default: `reports/OFFICIAL_VALIDATION_REPORT.md`): レポートの保存先。
+- **使用例**:
+  ```bash
+  astrotransit-gpu validate --results outputs/bench_219331_v39.csv
   ```
 
 ---

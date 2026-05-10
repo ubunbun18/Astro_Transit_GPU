@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "astrotransit-gpu"
-version = "1.0.0"
-description = "High-performance GPU-accelerated transit search platform"
+version = "1.3.0"
+description = "High-performance GPU-accelerated transit search platform optimized for NVIDIA Blackwell"
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [

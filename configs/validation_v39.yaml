@@ -1,0 +1,18 @@
+# V39 Scientific Validation Configuration
+# Purpose: Fix parameters to ensure reproducibility of recovery rates.
+
+validation:
+  power_threshold: 7.1      # TESS Standard significance
+  p_tol: 0.02              # 2% relative period error (Matches previous massive report)
+  t0_tol: 0.5               # 0.5 days T0 error (not strictly required for V39)
+  require_t0: true         # V39 screening prioritizes period coverage
+
+catalogs:
+  # Paths for offline fallback
+  toi_path: "data/catalogs/toi_latest.csv"
+  eb_path: "data/catalogs/eb_latest.csv"
+
+meta:
+  version: "1.3.0"
+  kernel: "V39 Apex Predator"
+  description: "Standard validation configuration for TESS Sector 1/2 screening."

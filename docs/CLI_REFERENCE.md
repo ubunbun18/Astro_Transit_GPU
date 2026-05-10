@@ -1,4 +1,4 @@
-# AstroTransit-GPU CLI Reference (v1.0.0)
+# AstroTransit-GPU CLI Reference (v1.3.0)
 
 AstroTransit-GPU provides a powerful command-line interface designed for high-throughput exoplanet transit search and reproducible scientific validation.
 
@@ -148,6 +148,20 @@ Utilizes the consolidated cache to analyze all targets in a sector at maximum GP
   ```bash
   # Screens 16,000 targets with 100k periods in ~30 minutes
   astrotransit-gpu screen-sector --cache-dir data/sector1_cache --n-periods 100000
+  ```
+
+---
+
+### 9. `validate` — Official Scientific Validation Pipeline
+Compares screening results (CSV) against known TOI (TESS Object of Interest) and EB (Eclipsing Binary) catalogs to calculate completeness and False Positive Rate (FPR).
+
+- **Arguments**:
+  - `--results` (Required): Path to the results CSV from `screen-sector` or `batch`.
+  - `--config` (Default: `configs/validation_v39.yaml`): YAML config to fix validation criteria.
+  - `--report` (Default: `reports/OFFICIAL_VALIDATION_REPORT.md`): Output report path.
+- **Usage**:
+  ```bash
+  astrotransit-gpu validate --results outputs/bench_219331_v39.csv
   ```
 
 ---

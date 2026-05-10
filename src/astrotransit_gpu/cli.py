@@ -14,6 +14,7 @@ from .search.cpu_reference_bls import run_astropy_bls
 from .inject.grid import run_injection_recovery_experiment, calculate_recovery_map
 from .data.sector_cache import SectorCache
 from .search.screener import GpuScreener
+from .validate.official_validator import OfficialValidator
 import lightkurve as lk
 
 def download_and_preprocess(target_id, data_dir=None, max_retries=2):
@@ -91,7 +92,7 @@ def download_and_preprocess(target_id, data_dir=None, max_retries=2):
             }
 
 def main():
-    parser = argparse.ArgumentParser(description="AstroTransit-GPU v1.0: High-performance Transit Search Platform")
+    parser = argparse.ArgumentParser(description="AstroTransit-GPU v1.3.0: High-performance Transit Search Platform")
     subparsers = parser.add_subparsers(dest="command")
 
     # 1. check
@@ -149,10 +150,16 @@ def main():
     parser_screen.add_argument("--precision", type=str, choices=["float32", "float64"], default="float32")
     parser_screen.add_argument("--blackwell", action="store_true", help="Force use of Blackwell-optimized V37 kernel")
 
+    # 7. validate
+    parser_validate = subparsers.add_parser("validate", help="Run official scientific validation pipeline")
+    parser_validate.add_argument("--results", type=str, required=True, help="Path to screening results CSV")
+    parser_validate.add_argument("--config", type=str, default="configs/validation_v39.yaml", help="Path to validation config")
+    parser_validate.add_argument("--report", type=str, default="reports/OFFICIAL_VALIDATION_REPORT.md", help="Output report path")
+
     args = parser.parse_args()
 
     if args.command == "check":
-        print(f"AstroTransit-GPU v1.0 Check")
+        print(f"AstroTransit-GPU v1.3.0 Check")
         try:
             import cupy as cp
             cuda_available = cp.cuda.is_available()
@@ -483,6 +490,27 @@ def main():
         results = screener.screen_sector(data, output_path=args.out, use_blackwell=args.blackwell)
         
         print(f"Screening complete. Final results saved to {args.out}")
+
+    elif args.command == "validate":
+        validator = OfficialValidator(args.config)
+        print(f"Running Official Validation: {args.results} ...")
+        results_df = pd.read_csv(args.results)
+        report_data = validator.run_validation(results_df)
+        summary = report_data['summary']
+        
+        print("\n--- Validation Summary ---")
+        print(f"  Total Targets: {summary['total_targets']:,}")
+        print(f"  Completeness:  {summary['completeness']:.2%}")
+        print(f"  New Candidates: {summary['new_candidates']:,}")
+        print(f"  FPR:           {summary['fpr']:.2%}")
+        
+        # Save Markdown Report
+        os.makedirs(os.path.dirname(args.report), exist_ok=True)
+        with open(args.report, "w", encoding="utf-8") as f:
+            f.write(f"# Official Validation Report\n\nGenerated: {pd.Timestamp.now()}\n\n")
+            f.write(pd.Series(summary).to_markdown())
+            f.write("\n")
+        print(f"\nReport saved to: {args.report}")
 
     else:
         parser.print_help()

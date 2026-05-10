@@ -89,7 +89,23 @@ print(f"Best Power (SNR): {results.best_power:.2f}")
 
 ## 📊 ベンチマークと検証
 
-詳細な検証手法と最新のベンチマーク結果については、[BENCHMARK_REPORT_JP.md](./BENCHMARK_REPORT_JP.md) を参照してください。
+### 公式検証パイプライン (V39 Reproducibility)
+V39 カーネルの科学的妥当性を再現するための標準手順が用意されています。
+
+```bash
+# 公式検証スクリプトの実行
+astrotransit-gpu validate --results outputs/bench_219331_v39.csv
+```
+
+#### 科学的判定基準 (Standard Criteria):
+検証に使用されるデフォルトの設定（`configs/validation_v39.yaml`）は以下の通りです：
+
+- **SNR 閾値**: `7.1` (TESS 標準の有意性レベル)
+- **周期許容誤差 (p_tol)**: `0.01` (真の周期の 1% 以内)
+- **T0 許容誤差 (t0_tol)**: `0.5` 日
+- **完備性対象**: 観測期間内で 2 回以上のトランジットが物理的に期待される天体（P < 13.7d）
+
+詳細な検証手法と最新のベンチマーク結果については、[BENCHMARK_REPORT_JP.md](./BENCHMARK_REPORT_JP.md) および [MASSIVE_VALIDATION_REPORT_JP.md](./reports/MASSIVE_VALIDATION_REPORT_JP.md) を参照してください。
 
 ## 📖 制限事項と注意点
 
