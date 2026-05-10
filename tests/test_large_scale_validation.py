@@ -33,7 +33,7 @@ def sample_toi():
 def test_validation_normal_case(sample_results, sample_toi):
     """正常系: direct match と harmonic match が正しく識別されるか"""
     validator = LargeScaleValidator(p_tol=0.03, power_threshold=10.0)
-    summary, matches, new_cands = validator.validate_results(sample_results, sample_toi)
+    summary, matches, new_cands, _, _ = validator.validate_results(sample_results, sample_toi)
     
     assert summary['toi_in_sample'] == 2  # 1001, 1002
     assert summary['recovered_toi'] == 2
@@ -47,7 +47,7 @@ def test_validation_normal_case(sample_results, sample_toi):
 def test_new_candidates_extraction(sample_results, sample_toi):
     """正常系: カタログ未登録の高Power天体が抽出されるか"""
     validator = LargeScaleValidator(p_tol=0.01, power_threshold=10.0)
-    _, _, new_cands = validator.validate_results(sample_results, sample_toi)
+    _, _, new_cands, _, _ = validator.validate_results(sample_results, sample_toi)
     
     # 1004 は Power 18.0 でカタログにない
     assert '1004' in new_cands['tic_id'].values
@@ -57,7 +57,7 @@ def test_new_candidates_extraction(sample_results, sample_toi):
 def test_boundary_power_threshold(sample_results, sample_toi):
     """境界値テスト: Powerがちょうど閾値の場合"""
     validator = LargeScaleValidator(power_threshold=18.0)
-    _, _, new_cands = validator.validate_results(sample_results, sample_toi)
+    _, _, new_cands, _, _ = validator.validate_results(sample_results, sample_toi)
     
     # 18.0 は > 18.0 でないので含まれない (仕様上の > vs >=)
     # 実装は > なので 18.0 は含まれないはず
@@ -66,13 +66,13 @@ def test_boundary_power_threshold(sample_results, sample_toi):
 def test_invariant_recovery_rate_range(sample_results, sample_toi):
     """不変条件検証: 回収率が 0.0 ~ 1.0 の範囲に収まるか"""
     validator = LargeScaleValidator()
-    summary, _, _ = validator.validate_results(sample_results, sample_toi)
+    summary, _, _, _, _ = validator.validate_results(sample_results, sample_toi)
     assert 0.0 <= summary['recovery_rate'] <= 1.0
 
 def test_empty_results():
     """異常系: 結果が空の場合"""
     validator = LargeScaleValidator()
-    summary, matches, new_cands = validator.validate_results(pd.DataFrame(), pd.DataFrame())
+    summary, matches, new_cands, _, _ = validator.validate_results(pd.DataFrame(), pd.DataFrame())
     assert summary['total_targets'] == 0
     assert matches.empty
     assert new_cands.empty
@@ -83,5 +83,5 @@ def test_contract_violation_negative_period():
     toi = pd.DataFrame({'tid': ['999'], 'pl_orbper': [10.0], 'pl_tranmid': [0], 'st_tmag': [12.0], 'st_teff': [5000]})
     
     validator = LargeScaleValidator()
-    _, matches, _ = validator.validate_results(res, toi)
+    _, matches, _, _, _ = validator.validate_results(res, toi)
     assert not matches['is_match'].iloc[0]
