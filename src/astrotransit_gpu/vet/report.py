@@ -7,14 +7,17 @@ def save_summary_json(df, out_dir, meta):
     """
     Saves a machine-readable summary of the vetting run.
     """
+    snr_thresh = float(meta.get('snr_threshold', 7.1))
+    
     summary = {
         "generated_at": datetime.now().isoformat(),
         "input_results": meta.get('input_results'),
         "config": meta.get('config_path'),
-        "total_targets": len(df),
-        "significant_signals": len(df[df['power'] > 0]), # Simplified
-        "known_tois": len(df[df['known_type'] == 'TOI']),
-        "known_ebs": len(df[df['known_type'] == 'EB']),
+        "snr_threshold": snr_thresh,
+        "total_candidates": len(df),
+        "significant_signals": len(df[df['snr'] >= snr_thresh]),
+        "known_tois": len(df[df['known_type'] == 'toi']),
+        "known_ebs": len(df[df['known_type'] == 'eb']),
         "unknown_candidates": len(df[df['known_type'] == 'unknown']),
         "high_score_unknowns": len(df[(df['known_type'] == 'unknown') & (df['vetting_score'] > 0.7)])
     }
@@ -48,11 +51,13 @@ def generate_html_report(df, out_dir, meta, report_name="index.html"):
     records = df.to_dict(orient='records')
     json_data = json.dumps(records)
     
-    # Stats
+    # Stats (using normalized SNR)
+    snr_thresh = float(meta.get('snr_threshold', 7.1))
     total = len(df)
-    tois = len(df[df['known_type'] == 'TOI'])
-    ebs = len(df[df['known_type'] == 'EB'])
+    tois = len(df[df['known_type'] == 'toi'])
+    ebs = len(df[df['known_type'] == 'eb'])
     unknowns = len(df[df['known_type'] == 'unknown'])
+    significant = len(df[df['snr'] >= snr_thresh])
     high_score = len(df[(df['known_type'] == 'unknown') & (df['vetting_score'] > 0.7)])
 
     html_template = f"""<!DOCTYPE html>
@@ -178,6 +183,7 @@ def generate_html_report(df, out_dir, meta, report_name="index.html"):
             border-radius: 3px;
             font-size: 10px;
             font-weight: 700;
+            text-transform: uppercase;
         }}
         
         .badge-toi {{ background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid #10b981; }}
@@ -201,6 +207,7 @@ def generate_html_report(df, out_dir, meta, report_name="index.html"):
             transition: all 0.2s;
         }}
         .btn-view:hover {{ background: var(--accent); color: white; }}
+        .btn-disabled {{ color: #4a5568; border-color: #4a5568; cursor: not-allowed; }}
 
         /* Modal */
         .modal-overlay {{
@@ -259,8 +266,8 @@ def generate_html_report(df, out_dir, meta, report_name="index.html"):
                 <div class="stat-value">{total}</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Unknown Candidates</div>
-                <div class="stat-value">{unknowns}</div>
+                <div class="stat-label">Significant (> {snr_thresh})</div>
+                <div class="stat-value">{significant}</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">High Score Unknowns</div>
@@ -290,7 +297,7 @@ def generate_html_report(df, out_dir, meta, report_name="index.html"):
                     <th onclick="sortTable('tic_id')">TIC ID</th>
                     <th onclick="sortTable('known_type')">Type</th>
                     <th onclick="sortTable('period')">Period (d)</th>
-                    <th onclick="sortTable('power')">Power</th>
+                    <th onclick="sortTable('snr')">SNR</th>
                     <th onclick="sortTable('depth')">Depth</th>
                     <th onclick="sortTable('duration')">Duration</th>
                     <th onclick="sortTable('vetting_score')">Score</th>
@@ -330,18 +337,26 @@ def generate_html_report(df, out_dir, meta, report_name="index.html"):
                 const scoreClass = c.vetting_score > 0.7 ? 'score-high' : '';
                 const harmonicTag = c.is_harmonic ? '<span class="badge badge-harmonic">H</span> ' : '';
                 
+                // Plot handling
+                let plotBtn = '';
+                if (c.plot_path) {{
+                    plotBtn = `<button class="btn-view" onclick="openModal('${{c.plot_path}}', '${{c.tic_id}}', '${{c.period}}')">View Plot</button>`;
+                }} else {{
+                    plotBtn = `<button class="btn-view btn-disabled" disabled>No Plot</button>`;
+                }}
+                
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td style="color:var(--text-dim)">#${{c.rank}}</td>
                     <td style="font-weight:700">${{c.tic_id}}</td>
                     <td><span class="${{typeClass}}">${{c.known_type}}</span></td>
                     <td>${{c.period.toFixed(5)}}</td>
-                    <td>${{c.power.toExponential(2)}}</td>
+                    <td>${{c.snr.toFixed(2)}}</td>
                     <td>${{(c.depth*100).toFixed(2)}}%</td>
                     <td>${{c.duration.toFixed(4)}}</td>
                     <td class="score-val ${{scoreClass}}">${{c.vetting_score.toFixed(3)}}</td>
                     <td class="note-text">${{harmonicTag}}${{c.notes}}</td>
-                    <td><button class="btn-view" onclick="openModal('${{c.tic_id}}', '${{c.period}}', ${{c.rank}})">View Plot</button></td>
+                    <td>${{plotBtn}}</td>
                 `;
                 tbody.appendChild(tr);
             }});

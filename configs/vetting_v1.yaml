@@ -1,37 +1,33 @@
-# Refinement selection rules
+# Vetting Pipeline Configuration V1
+# Used for Step 2 (Refinement) and Step 3 (Vetting/Reporting)
+
 refinement:
-  snr_threshold: 50000000000.0  # 5e10
-  top_n_targets: 50
-  random_sample_n: 10
+  snr_threshold: 5.0e10   # Candidates above this power are always refined
+  top_n_targets: 100      # Top N targets by power are always refined
+  random_sample_n: 10     # Randomly sample some targets for discovery
   
-  # Heuristics for "planet-like" low SNR
+  # Heuristics for rescuing interesting but lower SNR signals
   planet_like:
-    min_power: 10000000000.0    # 1e10
-    max_depth: 0.01      # 1%
-    max_duration_frac: 0.1 # duration < 10% of period
-    
-  # Heuristics for "artifact/EB-like" (to search for secondary signals)
-  artifact_like:
-    min_depth: 0.1       # Very deep
-    min_duration_frac: 0.3
+    min_power: 1.0e9
+    max_depth: 0.01       # 1% depth
+    max_duration_frac: 0.1 # 10% of period
 
-# Path to catalogs (Optional)
-toi_catalog: data/catalogs/toi_latest.csv
-eb_catalog: data/tess_eb_catalog.csv
+  # Search parameters for refinement
+  top_k: 5                # How many candidates to keep per star in refinement
+  n_periods: 10000        # Grid density for local re-search
 
-top_n_plots: 100
-
-# Scoring and ranking
 scoring:
   snr_weight: 1.0
-  snr_norm: 1000000000.0 # Adjusted for current GPU power scale
+  snr_norm: 1.0e9         # Normalization factor for raw power (power / snr_norm = SNR)
   plausibility_weight: 1.0
   known_toi_bonus: 0.5
   known_eb_penalty: -0.8
 
-harmonic_tolerance: 0.01
-top_n_plots: 50
+catalogs:
+  # Paths relative to project root
+  toi_catalog: data/catalogs/toi_latest.csv
+  eb_catalog: data/tess_eb_catalog.csv
 
-# Path to catalogs (Optional)
-# toi_catalog: data/catalogs/toi_list.csv
-# eb_catalog: data/catalogs/eb_list.csv
+reporting:
+  top_n_plots: 100        # How many candidates to generate plots for
+  out_dir: reports/sector1_vetting

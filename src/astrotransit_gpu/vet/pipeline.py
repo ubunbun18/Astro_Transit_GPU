@@ -29,8 +29,9 @@ def run_vetting_pipeline(results_csv, cache_dir=None, config_path=None, out_dir=
         df = df[df['status'] == 'ok'].copy()
         
     # 4. Apply Catalog Matching
-    toi_path = config.get('toi_catalog')
-    eb_path = config.get('eb_catalog')
+    cat_cfg = config.get('catalogs', {})
+    toi_path = cat_cfg.get('toi_catalog')
+    eb_path = cat_cfg.get('eb_catalog')
     df = apply_catalog_matching(df, toi_path=toi_path, eb_path=eb_path)
     
     # 5. Group Harmonics
@@ -39,7 +40,7 @@ def run_vetting_pipeline(results_csv, cache_dir=None, config_path=None, out_dir=
     
     # 6. Calculate Vetting Scores
     print("Calculating vetting scores...")
-    df = calculate_vetting_scores(df, config=config.get('scoring'))
+    df = calculate_vetting_scores(df, config=config)
     
     # 7. Sort and Rank
     df = df.sort_values('vetting_score', ascending=False)
@@ -56,15 +57,20 @@ def run_vetting_pipeline(results_csv, cache_dir=None, config_path=None, out_dir=
         try:
             sector_data = cache.load()
             plot_dir = os.path.join(out_dir, "plots")
-            generate_top_plots(df, sector_data, plot_dir, top_n=config.get('top_n_plots', 50))
+            # Capture the updated DF with plot_path
+            df = generate_top_plots(df, sector_data, plot_dir, top_n=config.get('reporting', {}).get('top_n_plots', 50))
         except Exception as e:
             print(f"Warning: Failed to generate plots: {e}")
             
     # 10. Generate Summary JSON & HTML Report
+    snr_norm = float(config.get('scoring', {}).get('snr_norm', 1e9))
+    raw_thresh = float(config.get('refinement', {}).get('snr_threshold', 7.1))
+
     meta = {
         "input_results": results_csv,
         "config_path": config_path,
-        "kernel_version": "V39 Apex Predator"
+        "kernel_version": "V39 Apex Predator",
+        "snr_threshold": raw_thresh / snr_norm if raw_thresh > 1000 else raw_thresh
     }
     
     from .report import save_summary_json, generate_html_report

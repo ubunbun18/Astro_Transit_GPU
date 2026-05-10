@@ -12,7 +12,7 @@ class CatalogMatch:
             try:
                 toi_df = pd.read_csv(toi_path)
                 # Flexible column detection
-                possible_cols = ['tic_id', 'TIC', 'tid', 'TICID', 'TIC ID']
+                possible_cols = ['tic_id', 'TIC', 'tid', 'TICID', 'TIC ID', 'tess_id']
                 col = next((c for c in possible_cols if c in toi_df.columns), None)
                 if col:
                     self.toi_ids = set(toi_df[col].dropna().astype(int).tolist())
@@ -22,7 +22,7 @@ class CatalogMatch:
         if eb_path and os.path.exists(eb_path):
             try:
                 eb_df = pd.read_csv(eb_path)
-                possible_cols = ['tic_id', 'TIC', 'tid', 'TICID', 'TIC ID']
+                possible_cols = ['tic_id', 'TIC', 'tid', 'TICID', 'TIC ID', 'tess_id']
                 col = next((c for c in possible_cols if c in eb_df.columns), None)
                 if col:
                     self.eb_ids = set(eb_df[col].dropna().astype(int).tolist())
@@ -33,9 +33,9 @@ class CatalogMatch:
         """Returns the type of the target if matched."""
         tid = int(tic_id)
         if tid in self.toi_ids:
-            return "TOI"
+            return "toi"
         if tid in self.eb_ids:
-            return "EB"
+            return "eb"
         return "unknown"
 
 def apply_catalog_matching(df, toi_path=None, eb_path=None):

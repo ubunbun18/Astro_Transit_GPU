@@ -543,24 +543,31 @@ def main():
         from .search.refiner import CandidateRefiner
         import yaml
         
-        # Load config for refinement rules
-        cfg = {}
+        # 1. Load full config safely
+        full_cfg = {}
         if args.config and os.path.exists(args.config):
-            with open(args.config, 'r') as f:
-                full_cfg = yaml.safe_load(f)
-                cfg = full_cfg.get('refinement', {})
+            try:
+                with open(args.config, 'r') as f:
+                    full_cfg = yaml.safe_load(f) or {}
+            except Exception as e:
+                print(f"Warning: Failed to load config {args.config}: {e}")
         
-        # CLI override
+        # 2. Extract specific sections
+        refine_cfg = full_cfg.get('refinement', {})
+        catalog_cfg = full_cfg.get('catalogs', {})
+        
+        # 3. CLI override
         if args.snr_threshold is not None:
-            cfg['snr_threshold'] = args.snr_threshold
+            refine_cfg['snr_threshold'] = args.snr_threshold
 
+        # 4. Execute refinement
         refiner = CandidateRefiner(cache_dir=args.cache_dir, n_periods=args.n_periods)
         refiner.refine_from_csv(
             input_csv=args.results,
             output_csv=args.out,
-            config=cfg,
-            toi_path=full_cfg.get('toi_catalog') if 'full_cfg' in locals() else None,
-            eb_path=full_cfg.get('eb_catalog') if 'full_cfg' in locals() else None,
+            config=refine_cfg,
+            toi_path=catalog_cfg.get('toi_catalog'),
+            eb_path=catalog_cfg.get('eb_catalog'),
             top_k=args.top_k
         )
 

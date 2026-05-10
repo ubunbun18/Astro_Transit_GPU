@@ -44,8 +44,9 @@ def plot_folded_candidate(time, flux, period, t0, out_path, title=None):
 def generate_top_plots(candidates_df, sector_data, out_dir, top_n=20):
     """
     Generates plots for the top N candidates in a directory.
-    Supports both vectorized and flat cache formats.
+    Updates the dataframe with a 'plot_path' column.
     """
+    top_n = int(top_n)
     os.makedirs(out_dir, exist_ok=True)
     
     # Check cache format
@@ -53,11 +54,19 @@ def generate_top_plots(candidates_df, sector_data, out_dir, top_n=20):
     tic_ids = sector_data['tic_ids']
     id_to_idx = {int(tid): i for i, tid in enumerate(tic_ids)}
     
+    # Initialize plot_path column
+    df = candidates_df.copy()
+    if 'plot_path' not in df.columns:
+        df['plot_path'] = ""
+        
     count = 0
-    # Use vetting_score if available, otherwise power
-    sort_key = 'vetting_score' if 'vetting_score' in candidates_df.columns else 'power'
+    # Use vetting_score for ranking
+    sort_key = 'vetting_score' if 'vetting_score' in df.columns else 'power'
     
-    for _, row in candidates_df.sort_values(sort_key, ascending=False).iterrows():
+    # We iterate over the sorted dataframe but update the original copy
+    sorted_df = df.sort_values(sort_key, ascending=False)
+    
+    for idx, row in sorted_df.iterrows():
         if count >= top_n:
             break
             
@@ -65,27 +74,38 @@ def generate_top_plots(candidates_df, sector_data, out_dir, top_n=20):
         if tid not in id_to_idx:
             continue
             
-        idx = id_to_idx[tid]
+        rank = count + 1
+        period = row['period']
+        
+        # New robust filename
+        plot_name = f"TIC_{tid}_rank{rank}_P{period:.5f}_folded.png"
+        out_path = os.path.join(out_dir, plot_name)
+        
+        idx_in_cache = id_to_idx[tid]
         
         if is_vectorized:
             time = sector_data['time']
-            flux = sector_data['flux'][idx]
-            flux_err = sector_data['flux_err'][idx]
+            flux = sector_data['flux'][idx_in_cache]
+            flux_err = sector_data['flux_err'][idx_in_cache]
             mask = flux_err < 0.99
             t_plot = time[mask]
             f_plot = flux[mask]
         else:
             offsets = sector_data['offsets']
-            start = offsets[idx]
-            end = offsets[idx+1] if idx+1 < len(offsets) else len(sector_data['flux'])
+            start = offsets[idx_in_cache]
+            end = offsets[idx_in_cache+1] if idx_in_cache+1 < len(offsets) else len(sector_data['flux'])
             t_plot = sector_data['time'][start:end]
             f_plot = sector_data['flux'][start:end]
             
         if len(f_plot) == 0:
             continue
             
-        out_path = os.path.join(out_dir, f"TIC_{tid}_folded.png")
-        title = f"TIC {tid} | Score: {row.get('vetting_score', 0):.2f} | P: {row['period']:.4f} d | Type: {row.get('known_type', 'unknown')}"
+        title = f"TIC {tid} | Rank {rank} | Score: {row.get('vetting_score', 0):.2f} | P: {period:.4f} d"
         
-        plot_folded_candidate(t_plot, f_plot, row['period'], row['t0'], out_path, title=title)
+        plot_folded_candidate(t_plot, f_plot, period, row['t0'], out_path, title=title)
+        
+        # Record relative path for HTML
+        df.at[idx, 'plot_path'] = f"plots/{plot_name}"
         count += 1
+        
+    return df

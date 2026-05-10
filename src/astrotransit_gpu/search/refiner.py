@@ -35,12 +35,12 @@ class CandidateRefiner:
         selected_indices = set()
         
         # Rule 1: SNR Threshold
-        snr_thresh = config.get('snr_threshold', 7.1)
+        snr_thresh = float(config.get('snr_threshold', 7.1))
         r1 = df[df['power'] >= snr_thresh].index
         selected_indices.update(r1.tolist())
         
         # Rule 2: Top N targets by SNR
-        top_n = config.get('top_n_targets', 0)
+        top_n = int(config.get('top_n_targets', 0))
         if top_n > 0:
             r2 = df.sort_values('power', ascending=False).head(top_n).index
             selected_indices.update(r2.tolist())
@@ -49,18 +49,20 @@ class CandidateRefiner:
         if toi_path or eb_path:
             from ..vet.catalog import CatalogMatch
             matcher = CatalogMatch(toi_path, eb_path)
-            # Find indices where tic_id is in catalogs
-            r3 = df[df['tic_id'].apply(lambda x: matcher.match(x) in ['TOI', 'EB'])].index
+            # Find indices where tic_id is in catalogs (match returns 'toi' or 'eb')
+            r3 = df[df['tic_id'].apply(lambda x: matcher.match(x) in ['toi', 'eb'])].index
             selected_indices.update(r3.tolist())
             
         # Rule 4 & 5: Heuristics
         p_cfg = config.get('planet_like', {})
         if p_cfg:
-            # SNR is low but planet-like
+            min_p = float(p_cfg.get('min_power', 1.0e9))
+            max_d = float(p_cfg.get('max_depth', 0.01))
+            max_dur_f = float(p_cfg.get('max_duration_frac', 0.1))
             r5 = df[
-                (df['power'] >= p_cfg.get('min_power', 5.0)) &
-                (df['depth'] <= p_cfg.get('max_depth', 0.01)) &
-                (df['duration'] <= df['period'] * p_cfg.get('max_duration_frac', 0.1))
+                (df['power'] >= min_p) &
+                (df['depth'] <= max_d) &
+                (df['duration'] <= df['period'] * max_dur_f)
             ].index
             selected_indices.update(r5.tolist())
             
