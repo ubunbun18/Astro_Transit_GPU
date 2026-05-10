@@ -13,8 +13,6 @@ from .search.api import BoxLeastSquaresGPU
 from .search.cpu_reference_bls import run_astropy_bls
 from .inject.grid import run_injection_recovery_experiment, calculate_recovery_map
 from .data.sector_cache import SectorCache
-from .search.screener import GpuScreener
-from .validate.official_validator import OfficialValidator
 import lightkurve as lk
 
 def download_and_preprocess(target_id, data_dir=None, max_retries=2):
@@ -479,6 +477,7 @@ def main():
         cache.build(args.fits_dir, workers=args.workers)
 
     elif args.command == "screen-sector":
+        from .search.screener import GpuScreener
         import pandas as pd
         cache = SectorCache(args.cache_dir)
         data = cache.load()
@@ -492,6 +491,7 @@ def main():
         print(f"Screening complete. Final results saved to {args.out}")
 
     elif args.command == "validate":
+        from .validate.official_validator import OfficialValidator
         validator = OfficialValidator(args.config)
         print(f"Running Official Validation: {args.results} ...")
         results_df = pd.read_csv(args.results)

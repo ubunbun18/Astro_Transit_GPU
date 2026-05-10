@@ -1,7 +1,10 @@
 import sys
 import os
 import numpy as np
-import cupy as cp
+try:
+    import cupy as cp
+except ImportError:
+    cp = None
 import time
 from astrotransit_gpu.search.cpu_reference_bls import run_astropy_bls
 from astrotransit_gpu.search.gpu_bls import run_gpu_bls

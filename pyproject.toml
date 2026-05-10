@@ -25,6 +25,7 @@ cuda12 = ["cupy-cuda12x"]
 dev = [
     "pytest",
     "pytest-cov",
+    "pytest-asyncio",
     "ruff",
     "mypy"
 ]
