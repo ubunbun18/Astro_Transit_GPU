@@ -2,8 +2,8 @@
 # Used for Step 2 (Refinement) and Step 3 (Vetting/Reporting)
 
 refinement:
-  snr_threshold: 5.0e10   # Candidates above this power are always refined
-  top_n_targets: 100      # Top N targets by power are always refined
+  snr_threshold: 5.0e10   # RAW POWER threshold (will be normalized by snr_norm for reporting)
+  top_n_targets: 100      # Top N targets by raw power are always refined
   random_sample_n: 10     # Randomly sample some targets for discovery
   
   # Heuristics for rescuing interesting but lower SNR signals

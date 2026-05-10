@@ -45,12 +45,7 @@ def run_vetting_pipeline(results_csv, cache_dir=None, config_path=None, out_dir=
     # 7. Sort and Rank
     df = df.sort_values('vetting_score', ascending=False)
     
-    # 8. Save results
-    ranked_csv = os.path.join(out_dir, "candidates_ranked.csv")
-    df.to_csv(ranked_csv, index=False)
-    print(f"Ranked candidates saved to {ranked_csv}")
-    
-    # 9. Generate Plots if cache is available
+    # 8. Generate Plots if cache is available
     if cache_dir and os.path.exists(cache_dir):
         print(f"Generating top plots using cache from {cache_dir}...")
         cache = SectorCache(cache_dir)
@@ -61,6 +56,11 @@ def run_vetting_pipeline(results_csv, cache_dir=None, config_path=None, out_dir=
             df = generate_top_plots(df, sector_data, plot_dir, top_n=config.get('reporting', {}).get('top_n_plots', 50))
         except Exception as e:
             print(f"Warning: Failed to generate plots: {e}")
+
+    # 9. Save results (now including plot_path)
+    ranked_csv = os.path.join(out_dir, "candidates_ranked.csv")
+    df.to_csv(ranked_csv, index=False)
+    print(f"Ranked candidates saved to {ranked_csv}")
             
     # 10. Generate Summary JSON & HTML Report
     snr_norm = float(config.get('scoring', {}).get('snr_norm', 1e9))

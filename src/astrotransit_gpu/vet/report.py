@@ -401,8 +401,7 @@ def generate_html_report(df, out_dir, meta, report_name="index.html"):
             renderTable(filtered);
         }}
         
-        function openModal(tic_id, period, rank) {{
-            const path = `plots/TIC_${{tic_id}}_folded.png`;
+        function openModal(plotPath, ticId, period) {{
             const img = document.getElementById('modal-img');
             img.style.display = 'block';
             
@@ -410,7 +409,7 @@ def generate_html_report(df, out_dir, meta, report_name="index.html"):
             const oldMsg = document.getElementById('placeholder-msg');
             if (oldMsg) oldMsg.remove();
 
-            img.src = path;
+            img.src = plotPath;
             img.onerror = function() {{
                 this.style.display = 'none';
                 const msg = document.createElement('div');
@@ -423,12 +422,12 @@ def generate_html_report(df, out_dir, meta, report_name="index.html"):
                 msg.innerHTML = `
                     <div style="font-size: 24px; margin-bottom: 10px;">📉</div>
                     <div>Plot Not Generated</div>
-                    <div style="font-size: 11px; margin-top: 5px;">This candidate is outside the Top-100 plot generation limit.</div>
+                    <div style="font-size: 11px; margin-top: 5px;">File not found: ${{plotPath}}</div>
                 `;
                 this.parentNode.insertBefore(msg, this);
                 this.onerror = null;
             }};
-            document.getElementById('modal-title').innerText = `TIC ${{tic_id}} | P = ${{parseFloat(period).toFixed(5)}} d`;
+            document.getElementById('modal-title').innerText = `TIC ${{ticId}} | P = ${{parseFloat(period).toFixed(5)}} d`;
             document.getElementById('modal-overlay').style.display = 'block';
             document.getElementById('plot-modal').style.display = 'block';
         }}
