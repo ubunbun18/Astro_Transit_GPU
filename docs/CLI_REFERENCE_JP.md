@@ -33,6 +33,8 @@ AstroTransit-GPU のコマンドラインインターフェースは、研究者
   - `--target` (必須): ターゲットの TIC ID。
   - `--n-periods` (Default: 5000): 探索する周期の数。
   - `--precision` (Default: `float32`): 計算精度。`float32` または `float64`。
+  - `--method` (Default: `fast`): 探索メソッド。`fast` (高速版 V41/V39) または `parity` (Astropy 完全一致版 V42)。
+  - `--max-bins` (Default: 2000): パリティモード時の最大ビン数。大きくすると長周期に対応できますが、GPU メモリを消費します。
   - `--out`: 結果（JSON形式）の保存先パス。
 - **使用例**:
   ```bash
@@ -101,6 +103,24 @@ astrotransit-gpu benchmark --config config.yaml [--outdir reports] [--gpu-only]
 - `--config`: YAML 設定ファイルのパス。
 - `--outdir`: レポート出力先ディレクトリ（デフォルト: `reports`）。
 - `--gpu-only`: CPU (Astropy) での比較計測をスキップします。超大規模探索時に推奨。
+
+---
+
+### 6. `batch` — 複数ターゲットの一括解析
+非同期 I/O を活用して、リストにある複数の天体を一気にダウンロード・前処理・解析します。
+
+- **使用例**:
+  ```bash
+  astrotransit-gpu batch --targets targets.csv [--out results.csv] [--workers 4] [--method parity]
+  ```
+- **引数**:
+  - `--targets`: `tic_id` カラムを含む CSV ファイル。
+  - `--out`: 出力先の CSV ファイル名（デフォルト: `batch_results.csv`）。
+  - `--workers`: ダウンロードと前処理を行う並列スレッド数（デフォルト: 4）。
+  - `--method`: GPU 探索メソッド (`fast` または `parity`)。
+  - `--max-bins`: パリティモード時の最大ビン数。
+  - `--resume`: 既に出力 CSV に存在する（成功した）天体をスキップして再開します。
+- **堅牢性**: 破損した FITS キャッシュファイルの自動検出・削除および再取得機能を搭載しています。
 
 ---
 

@@ -101,6 +101,8 @@ def main():
     parser_search.add_argument("--target", type=str, required=True, help="Target TIC ID")
     parser_search.add_argument("--n-periods", type=int, default=5000)
     parser_search.add_argument("--precision", choices=["float32", "float64"], default="float32")
+    parser_search.add_argument("--method", choices=["fast", "parity"], default="fast", help="Search method: fast (V41) or parity (V42)")
+    parser_search.add_argument("--max-bins", type=int, default=2000, help="Maximum bins for parity mode")
     parser_search.add_argument("--out", type=str, help="Save result to file")
 
     # 3. compare
@@ -133,6 +135,8 @@ def main():
     parser_batch.add_argument("--data-dir", type=str, default=None, help="Local directory for FITS files")
     parser_batch.add_argument("--n-periods", type=int, default=5000, help="Number of test periods")
     parser_batch.add_argument("--cpu", action="store_true", help="Use CPU (Astropy) instead of GPU")
+    parser_batch.add_argument("--method", choices=["fast", "parity"], default="fast", help="GPU search method")
+    parser_batch.add_argument("--max-bins", type=int, default=2000, help="Max bins for parity mode")
 
     # build-cache command
     parser_cache = subparsers.add_parser("build-cache", help="Build consolidated binary cache for a sector")
@@ -202,7 +206,7 @@ def main():
         print(f"Searching {args.target} ({len(t)} points, {args.n_periods} periods)...")
         model = BoxLeastSquaresGPU(t, y, dy=dy)
         dtype = np.float32 if args.precision == "float32" else np.float64
-        res = model.power(periods, durations, dtype=dtype)
+        res = model.power(periods, durations, dtype=dtype, method=args.method, max_bins=args.max_bins)
         
         print(f"\nBest Result:")
         print(f"  Period: {res.best_period:.6f} d")
@@ -459,7 +463,7 @@ def main():
                                 gpu_start = time.time()
                                 if not args.cpu:
                                     model = BoxLeastSquaresGPU(item['time_array'], item['flux_array'], dy=item['dy_array'])
-                                    res_obj = model.power(periods, durations)
+                                    res_obj = model.power(periods, durations, method=args.method, max_bins=args.max_bins)
                                     best_period = res_obj.best_period
                                     best_t0 = res_obj.best_t0
                                     best_depth = res_obj.best_depth

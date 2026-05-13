@@ -32,6 +32,8 @@ Perform a fast BLS search directly on a specific target.
   - `--target` (Required): Target identifier (e.g., "TIC 261136679").
   - `--n-periods` (Default: 5000): Number of periods to search in the grid.
   - `--precision` (Default: `float32`): Computation precision (`float32` or `float64`).
+  - `--method` (Default: `fast`): Search method. `fast` (V41/V39 optimized) or `parity` (V42, bit-perfect match with Astropy).
+  - `--max-bins` (Default: 2000): Maximum bins for parity mode. Higher values support longer periods but consume more GPU shared memory.
   - `--out`: Path to save results in JSON format.
 - **Usage**:
   ```bash
@@ -114,6 +116,8 @@ astrotransit-gpu batch --targets targets.csv [--out results.csv] [--workers 4] [
 - `--targets`: CSV file containing a `tic_id` column.
 - `--out`: Output CSV filename (default: `batch_results.csv`).
 - `--workers`: Number of parallel threads for download and preprocessing (default: 4).
+- `--method` (Default: `fast`): GPU search method (`fast` or `parity`).
+- `--max-bins` (Default: 2000): Maximum bins for parity mode.
 - `--resume`: Skip targets already marked as `ok` in the output CSV.
 - **Robustness**: Includes automated detection and cleanup of corrupted FITS cache files with automatic retry.
 - **Usage**:

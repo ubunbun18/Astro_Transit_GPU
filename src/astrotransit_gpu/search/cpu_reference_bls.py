@@ -11,9 +11,9 @@ def run_astropy_bls(time, flux, dy=None, periods=None, period_min=0.5, period_ma
     model = BoxLeastSquares(time, flux, dy=dy)
     
     if periods is None:
-        results = model.autopower(durations, minimum_period=period_min, maximum_period=period_max)
+        results = model.autopower(durations, minimum_period=period_min, maximum_period=period_max, objective="snr")
     else:
-        results = model.power(periods, durations)
+        results = model.power(periods, durations, objective="snr")
     
     best_idx = np.argmax(results.power)
     best_period = results.period[best_idx]
@@ -26,6 +26,7 @@ def run_astropy_bls(time, flux, dy=None, periods=None, period_min=0.5, period_ma
         "t0": best_t0,
         "duration": best_duration,
         "depth": best_depth,
-        "power": results.power[best_idx],
+        "best_power": results.power[best_idx],
+        "power": results.power,
         "snr": results.depth_snr[best_idx]
     }

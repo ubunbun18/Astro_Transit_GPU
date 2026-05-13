@@ -1,114 +1,97 @@
-# AstroTransit-GPU (v1.3.0)
+# AstroTransit-GPU (v1.4.0)
 
 [![CI](https://github.com/ubunbun18/Astro_Transit_GPU/actions/workflows/ci.yml/badge.svg)](https://github.com/ubunbun18/Astro_Transit_GPU/actions/workflows/ci.yml)
-[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](./CHANGELOG.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-**AstroTransit-GPU** is a high-performance, researcher-grade platform for exoplanet transit discovery. It accelerates the Box Least Squares (BLS) algorithm using custom CUDA kernels while ensuring rigorous numerical parity with Astropy. It is designed for reproducible scientific analysis, featuring automated benchmarking and injection/recovery suites.
+**AstroTransit-GPU** is a high-performance, researcher-grade platform for exoplanet transit discovery. It bridges the gap between massive-scale screening and rigorous scientific validation by providing two specialized CUDA engines: the high-throughput **Fast Engine (V41)** and the high-precision **Parity Engine (V42)**.
+
+---
 
 ## 🌟 Key Features
 
-- **Blazing Fast & Accurate**: Achieves >100x throughput vs. Astropy while maintaining high scientific fidelity.
-- **Apex Predator (V39)**: Latest robust kernel optimized for NVIDIA Blackwell. Capable of screening **21.9 Billion (Target, Period) pairs in ~9.4 minutes** (~39 million pairs/sec) with weighted SNR.
-- **Scientific Validation**: Verified against NASA TOI catalog with **38.75% recovery rate** in Sector 1 FFI data.
-- **Survey-Scale Pipeline**: Uses a **Consolidated Sector Cache** system to eliminate disk I/O bottlenecks.
-- **Ultra-High Throughput**: Capable of screening an entire TESS sector (16k targets) with **100k periods in < 45 seconds** (Blackwell V39).
-- **Astropy-Compatible API**: Features the `BoxLeastSquaresGPU` class for easy integration.
-- **Production-Ready & Robust**: Automated detection and cleanup of corrupt FITS cache with retry logic.
-- **Full Precision Support**: Supports weighted observations (`flux_err`) and `float64` precision.
-- **Extreme Reproducibility**: Uses YAML-based configurations, fixed seeds, and robust statistical metrics (Median/P95).
+| Feature | Description |
+| :--- | :--- |
+| **🚀 High-Speed Screening** | Screen a full TESS sector (15,881 targets) in **~73 seconds** (V41, 5,000 periods, measured). |
+| **🎯 Numerical Fidelity** | Proven correlation of **0.999997** and ΔT0 of **1.43e-08 d** vs Astropy (V42). |
+| **🛠️ Dual Engine** | Choose between **High-Throughput Screening** and **Scientific Validation**. |
+| **📦 Survey Pipeline** | Consolidated Binary Cache system to eliminate disk I/O bottlenecks. |
+| **🧪 Validated** | Verified against NASA TOI catalog with **38.75% recovery rate** (Sector 1 FFI). |
+| **💻 Modern API** | Astropy-compatible `BoxLeastSquaresGPU` class for seamless Python integration. |
 
-## 🚀 Apex Predator (V39)
+---
 
-For massive-scale screening (e.g., TESS QLP full survey), we provide the **V39 "Apex Predator"** engine. This engine is specifically tuned for NVIDIA Blackwell (and RTX 40-series) GPUs and features **Weight-aware SNR** calculation to handle observation gaps and padding.
+## 🏎️ Dual Engine Architecture
 
-### Features:
-- **Winner-Take-All Output**: To maximize speed, V37 returns only the **single best candidate per target** instead of the full power spectrum, eliminating memory bandwidth bottlenecks.
-- **Zero-Div Logic**: Replaces costly division units with cross-multiplication for score comparison.
-- **Zero-Spill SMEM**: Moves binning accumulators to bank-optimized Shared Memory to eliminate register pressure.
-- **Warp-Parallel Scan**: Parallelizes prefix sums using high-speed warp shuffles.
+AstroTransit-GPU v1.4.0 introduces a dual-engine strategy to cover the entire transit search workflow.
 
-### Usage (CLI):
-```bash
-python -m astrotransit_gpu screen-sector \
-  --cache-dir data/sector1_cache \
-  --out outputs/bench_219331_v39.csv \
-  --n-periods 100000 \
-  --blackwell
-```
+### 1. Fast Engine (V41) — *For Screening*
+Designed for massive-scale surveys. Tuned for NVIDIA Blackwell (and RTX 40-series) architectures.
+- **Throughput**: **234 LC/s** (5,000 periods, 15,000 data points).
+- **Optimization**: Branchless boundary processing, algebraic FDIV reduction, 100% Warp Occupancy.
+- **Caveat**: Uses parallel atomic operations; non-deterministic with tiny numerical drift (5.72e-06).
 
-### Usage (Python API):
-```python
-periods = np.linspace(0.5, 20.0, 100000)
-durations = np.linspace(0.01, 0.2, 5)
+### 2. Parity Engine (V42) — *For Validation*
+Designed for scientific reproducibility. Bit-level identical operation order to CPU reference.
+- **Accuracy**: **Correlation = 0.999997** vs Astropy; Numerical Drift = **0.000000** (Perfect Determinism).
+- **Throughput**: **48 LC/s** (5,000 periods, 15,000 data points).
+- **Best for**: Final candidate verification and generating paper-quality results.
 
-screener = GpuScreener(periods, durations, n_bins=128)
-results = screener.screen_sector_vbls(data, use_blackwell=True)
-```
+---
 
-## 🚀 Installation
+## 🚀 Quick Start
 
-While the package can be installed on CPU-only environments, a CUDA-enabled GPU and CuPy are required for acceleration.
-
-```bash
-# Clone and install in editable mode (recommended)
-git clone https://github.com/ubunbun18/Astro_Transit_GPU.git
-cd Astro_Transit_GPU
-pip install -e ".[cuda12,benchmark]"
-```
-
-## 🛠️ Quick Start (Python API)
-
+### Python API Integration
 ```python
 from astrotransit_gpu import BoxLeastSquaresGPU
-import numpy as np
 
-# Prepare your light curve data
-t = np.linspace(0, 10, 5000)
-y = np.ones_like(t)  # flux
-dy = np.ones_like(t) * 0.001 # error (optional)
-
-# Initialize the model (Astropy-compatible)
+# Initialize with time, flux, and optional error
 model = BoxLeastSquaresGPU(t, y, dy=dy)
 
-# Run the search
-periods = np.linspace(0.5, 20.0, 10000)
-durations = [0.05, 0.1, 0.15]
-results = model.power(periods, durations, n_bins=500)
+# High-Throughput Mode (Default)
+res_fast = model.power(periods, durations, method="fast")
 
-print(f"Best Period: {results.best_period:.4f} days")
-print(f"Best Power (SNR): {results.best_power:.2f}")
+# Scientific Parity Mode (Astropy-Compatible)
+res_exact = model.power(periods, durations, method="parity")
 ```
 
-## 💻 CLI Commands
+### Command Line Interface
+```bash
+# Diagnostic check
+astrotransit-gpu check
 
-| Command | Description |
-| :--- | :--- |
-| `check` | Diagnose GPU availability and CUDA environment. |
-| `compare` | Direct performance and accuracy comparison with CPU. Supports `--preset`. |
-| `inject` | Run injection/recovery experiments and generate Recovery Heatmaps. |
-| `benchmark` | Automated report generation from YAML configuration files. |
-| `search` | Quick search and result visualization for a single target. |
-| `batch` | Mass analysis for target lists. |
-| `build-cache` | Consolidate thousands of FITS files into a high-speed flat binary. |
-| `screen-sector` | High-speed sector-wide screening using consolidated cache. |
+# Search a target using the Parity mode
+astrotransit-gpu search --target "TIC 261136679" --method parity
 
-For detailed arguments and usage examples, please refer to the [CLI Reference (docs/CLI_REFERENCE.md)](./docs/CLI_REFERENCE.md).
+# Run a sector-wide screening using the Fast engine
+astrotransit-gpu screen-sector --cache-dir ./data_cache --n-periods 5000
+```
 
-## 📊 Benchmarks
+---
 
-For detailed performance metrics, hardware configurations, and reproduction steps, please refer to [BENCHMARK_REPORT.md](./BENCHMARK_REPORT.md).
+## 📊 Measured Benchmarks (v1.4.0)
 
-## 📖 Limitations & Notes
+**Hardware**: AMD Ryzen 7 9700X + NVIDIA GeForce RTX 5060 Ti (Blackwell)
+**Conditions**: 5,000 periods, 15,000 data points per target
 
-- The GPU backend currently utilizes a Phase Binning algorithm for extreme throughput.
-- Default precision is `float32`. Use `float64` for ultra-long baseline data where phase precision is critical.
-- This package is intended for rapid candidate screening and does not include full MCMC fitting.
+| Kernel | Throughput (LC/s) | Speedup (vs CPU) | Correlation (vs Astropy) |
+| :--- | :--- | :--- | :--- |
+| CPU (Astropy) | 3.97 | 1.0x | 1.000000 |
+| **V41 (Fast)** | **234.07** | **58.9x** | 0.967864 |
+| **V42 (Parity)** | **48.05** | **12.1x** | **0.999997** |
 
-## 📄 Citation
+**Full Sector (15,881 targets) Marathon Results**:
+- V41 (Fast): **72.78 sec (1.21 min)**
+- V42 (Parity): **362.95 sec (6.05 min)**
+- CPU (Astropy): **~4,000 sec (66.67 min)** (Extrapolated from 3.97 LC/s)
 
-If you use this software in your research, please cite it using the metadata provided in [CITATION.cff](./CITATION.cff).
+---
 
-## ⚖️ License
+## 📄 Documentation
+- [CLI Reference](./docs/CLI_REFERENCE.md)
+- [Kernel Selection Guide](./docs/KERNEL_GUIDE_V39_V42_JP.md)
+- [Benchmark Report V3](./BENCHMARK_REPORT_V3.md)
+- [Sector Cache Design](./docs/SECTOR_CACHE_V2.md)
 
-Distributed under the MIT License. See [LICENSE](./LICENSE) for more information.
+---
+© 2026 AstroTransit-GPU Team. Licensed under MIT.
