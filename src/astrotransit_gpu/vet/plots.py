@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+from ..constants import FLUX_ERR_PAD_THRESHOLD
 
 def plot_folded_candidate(time, flux, period, t0, out_path, title=None):
     """
@@ -87,7 +88,7 @@ def generate_top_plots(candidates_df, sector_data, out_dir, top_n=20):
             time = sector_data['time']
             flux = sector_data['flux'][idx_in_cache]
             flux_err = sector_data['flux_err'][idx_in_cache]
-            mask = flux_err < 0.99
+            mask = flux_err < FLUX_ERR_PAD_THRESHOLD
             t_plot = time[mask]
             f_plot = flux[mask]
         else:

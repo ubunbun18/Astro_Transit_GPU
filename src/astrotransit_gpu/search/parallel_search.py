@@ -1,8 +1,7 @@
-import cupy as cp
 import numpy as np
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import os
-from ..search.gpu_bls import run_gpu_bls
+from ..search.gpu_bls import run_gpu_bls, _require_cupy
 
 def _worker_process_data(target_id):
     """External worker function for ProcessPoolExecutor"""
@@ -19,6 +18,7 @@ def _worker_process_data(target_id):
 
 class AsyncTransitSearchEngine:
     def __init__(self, n_workers=None, n_streams=4):
+        cp = _require_cupy()
         self.n_workers = n_workers or (os.cpu_count() or 4)
         self.n_streams = n_streams
         self.streams = [cp.cuda.Stream(non_blocking=True) for _ in range(n_streams)]

@@ -144,6 +144,7 @@ extern "C" __global__ void vbls_ultra_kernel(
             best_t0_matrix[out_idx] = b_t0;
             best_dur_matrix[out_idx] = b_dur;
             best_depth_matrix[out_idx] = b_dep;
+            best_period_matrix[out_idx] = p_val;
         }
     }
 }

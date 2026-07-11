@@ -9,6 +9,15 @@ from ..validate.match import match_candidate
 
 logger = logging.getLogger(__name__)
 
+# Completeness evaluation constants.
+# A TESS sector baseline is ~27.4 days. To observe at least MIN_TRANSITS
+# transits within the baseline, the period must satisfy
+# (MIN_TRANSITS - 1) * P < SECTOR_BASELINE_DAYS, i.e. P < baseline / (MIN_TRANSITS - 1).
+# With MIN_TRANSITS = 2 this gives P < 27.4 days (two transits: at t=0 and at t=P).
+SECTOR_BASELINE_DAYS = 27.4
+MIN_TRANSITS_FOR_COMPLETENESS = 2
+MAX_DETECTABLE_PERIOD_DAYS = SECTOR_BASELINE_DAYS / (MIN_TRANSITS_FOR_COMPLETENESS - 1)
+
 class OfficialValidator:
     """
     V39以降の科学検証を標準手順化するための公式検証クラス。
@@ -82,8 +91,9 @@ class OfficialValidator:
         sample_tic_ids = set(results_df['tic_id'])
         tois_in_sample = toi_df[toi_df['tid'].isin(sample_tic_ids)].copy()
         
-        # セクター1/2のベースライン(27.4日)に対し、2回以上のトランジットが見える周期(13.7日)を完備性評価の対象とする
-        detectable_tois = tois_in_sample[tois_in_sample['pl_orbper'] < 13.7].copy()
+        # ベースライン内に最低2回のトランジットが観測できる周期を完備性評価の対象とする
+        # (P < SECTOR_BASELINE_DAYS / (MIN_TRANSITS - 1) = 27.4 / 1 = 27.4 日)
+        detectable_tois = tois_in_sample[tois_in_sample['pl_orbper'] < MAX_DETECTABLE_PERIOD_DAYS].copy()
         
         # 3. マッチング
         results_dict = results_df.set_index('tic_id').to_dict('index')

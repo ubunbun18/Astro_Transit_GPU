@@ -5,6 +5,7 @@ import lightkurve as lk
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor
 from ..preprocess.clean import clean_lightcurve, to_arrays
+from ..constants import FLUX_ERR_PAD_THRESHOLD
 
 def _process_one_fits(fits_path):
     """Worker function to read and clean one FITS file (optimized raw read)."""
@@ -190,7 +191,7 @@ class SectorCache:
             flux = loaded_data['flux'][idx]
             flux_err = loaded_data['flux_err'][idx]
             # Standard mask for vectorized padding
-            mask = flux_err < 0.99
+            mask = flux_err < FLUX_ERR_PAD_THRESHOLD
             return {
                 "time": time[mask],
                 "flux": flux[mask],

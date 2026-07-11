@@ -1,14 +1,15 @@
 import numpy as np
 import os
-import cupy as cp
+from .gpu_bls import _require_cupy
 
 _v42_kernel_cache = {}
 
 def get_v42_kernel(dtype):
+    cp = _require_cupy()
     dtype_name = np.dtype(dtype).name
     if dtype_name in _v42_kernel_cache:
         return _v42_kernel_cache[dtype_name]
-        
+
     kernel_path = os.path.join(os.path.dirname(__file__), "kernels", "vbls_v42_parity.cu")
     with open(kernel_path, "r") as f:
         cuda_source = f.read()
@@ -23,11 +24,14 @@ def get_v42_kernel(dtype):
     _v42_kernel_cache[dtype_name] = kernel
     return kernel
 
-def run_vbls_exact_parity(time_array, flux_matrix, periods, durations, weights_matrix=None, 
-                          oversample=10, max_bins=2000, dtype=cp.float32):
+def run_vbls_exact_parity(time_array, flux_matrix, periods, durations, weights_matrix=None,
+                          oversample=10, max_bins=2000, dtype=None):
     """
     V42 Exact Parity Kernel - Returns exactly Astropy objective="snr" values.
     """
+    cp = _require_cupy()
+    if dtype is None:
+        dtype = cp.float32
     n_targets, n_data = flux_matrix.shape
     n_periods = len(periods)
     n_durations = len(durations)

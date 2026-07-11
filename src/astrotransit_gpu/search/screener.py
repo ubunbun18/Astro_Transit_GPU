@@ -1,13 +1,16 @@
 import time
 import numpy as np
-import cupy as cp
 from tqdm import tqdm
-from .gpu_bls import run_gpu_bls
+from .gpu_bls import run_gpu_bls, _require_cupy
+from ..constants import FLUX_ERR_PAD_THRESHOLD
 
 class GpuScreener:
     """High-performance screening engine for entire sectors."""
-    
-    def __init__(self, periods, durations, n_bins=200, dtype=cp.float32):
+
+    def __init__(self, periods, durations, n_bins=200, dtype=None):
+        cp = _require_cupy()
+        if dtype is None:
+            dtype = cp.float32
         self.periods = cp.asarray(periods, dtype=dtype)
         self.durations = cp.asarray(durations, dtype=dtype)
         self.n_bins = n_bins
@@ -35,6 +38,7 @@ class GpuScreener:
         """Ultra-fast vectorized screening for uniform-length data (Scales to 1M targets)."""
         from .vbls import run_vbls_massive
         import csv
+        cp = _require_cupy()
         
         tic_ids = sector_data['tic_ids']
         n_targets = len(tic_ids)
@@ -46,9 +50,9 @@ class GpuScreener:
             err_matrix = cp.asarray(sector_data['flux_err'], dtype=self.dtype)
             
             # V39: Weight calculation with padding handling
-            # Pad value is 1.0, real error is < 0.1
+            # Pad value is FLUX_ERR_PAD_SENTINEL; mask it out via the shared threshold.
             weights_matrix = 1.0 / (err_matrix**2)
-            weights_matrix[err_matrix > 0.9] = 0.0
+            weights_matrix[err_matrix > FLUX_ERR_PAD_THRESHOLD] = 0.0
             n_pts = len(common_time)
         else:
             # Legacy/Ragged Format - Manual Reshape
@@ -61,7 +65,7 @@ class GpuScreener:
             flux_matrix = flux_all.reshape(n_targets, n_pts)
             
             weights_matrix = 1.0 / (err_all**2)
-            weights_matrix[err_all > 0.9] = 0.0
+            weights_matrix[err_all > FLUX_ERR_PAD_THRESHOLD] = 0.0
             weights_matrix = weights_matrix.reshape(n_targets, n_pts)
         
         # Prepare CSV file

@@ -1,8 +1,8 @@
 import numpy as np
 import os
-import cupy as cp
 import time
 import logging
+from .gpu_bls import _require_cupy
 
 logger = logging.getLogger(__name__)
 
@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 _vbls_kernel_cache = {}
 
 def get_vbls_kernels(dtype, n_data, n_bins, n_durations, use_blackwell=None):
+    cp = _require_cupy()
     dtype_name = np.dtype(dtype).name
     
     if use_blackwell is None:
@@ -58,19 +59,19 @@ def get_vbls_kernels(dtype, n_data, n_bins, n_durations, use_blackwell=None):
     _vbls_kernel_cache[cache_key] = kernels
     return kernels
 
-def run_vbls_massive(time_array, flux_matrix, periods, durations, weights_matrix=None, n_bins=128, dtype=cp.float32, 
+def run_vbls_massive(time_array, flux_matrix, periods, durations, weights_matrix=None, n_bins=128, dtype=None,
                      target_batch_size=4000, period_batch_size=20000, use_blackwell=None):
     """
     V37 Apex Predator Pipeline.
     """
+    cp = _require_cupy()
+    if dtype is None:
+        dtype = cp.float32
     n_targets_total, n_data = flux_matrix.shape
     n_periods_total = len(periods)
     n_durations = len(durations)
     dtype = np.dtype(dtype)
     scalar_t = np.float32 if dtype == np.float32 else np.float64
-    
-    if n_bins != 128:
-        n_bins = 128
 
     kernels = get_vbls_kernels(dtype, n_data, n_bins, n_durations, use_blackwell=use_blackwell)
     t_start = scalar_t(time_array[0].item())

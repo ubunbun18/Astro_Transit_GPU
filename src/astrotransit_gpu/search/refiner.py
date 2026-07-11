@@ -24,18 +24,23 @@ class CandidateRefiner:
         
         if config is None:
             config = {
-                'snr_threshold': 7.1,
+                'snr_threshold': 0.0,
                 'top_n_targets': 100,
                 'random_sample_n': 5
             }
-            
+
         print(f"Selecting targets for refinement from {len(df)} candidates...")
 
         # --- SELECTION RULES ---
         selected_indices = set()
-        
-        # Rule 1: SNR Threshold
-        snr_thresh = float(config.get('snr_threshold', 7.1))
+
+        # Rule 1: Power Threshold
+        # NOTE: df['power'] is RAW POWER (~1e9 scale for V39), NOT SNR.
+        # To get SNR, divide by snr_norm (1e9). The threshold here is compared
+        # directly against the raw power column, so use a raw-power-scale value
+        # (e.g. vetting_v1.yaml uses snr_threshold: 5.0e10).
+        # A default of 0.0 disables this rule; selection falls back to other rules.
+        snr_thresh = float(config.get('snr_threshold', 0.0))
         r1 = df[df['power'] >= snr_thresh].index
         selected_indices.update(r1.tolist())
         
